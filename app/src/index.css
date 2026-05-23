@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #0a0a14; color: #e8e8f0; min-height: 100vh; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a3e; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a3a4e; }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200;
+  }
+  .btn-primary {
+    @apply bg-[#9651b8] text-white hover:bg-[#7a3f9e] hover:shadow-lg hover:shadow-[#9651b8]/20 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply text-gray-400 hover:text-white hover:bg-white/5;
+  }
+  .input {
+    @apply w-full rounded-lg border border-surface-border bg-surface-light px-3 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none transition-colors focus:border-[#9651b8] focus:ring-1 focus:ring-[#9651b8]/30;
+  }
+  .card {
+    @apply rounded-xl border border-surface-border bg-surface-light p-6;
+  }
+}
+
+.typing-indicator span {
+  animation: blink 1.4s infinite both;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink {
+  0% { opacity: 0.2; }
+  20% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
