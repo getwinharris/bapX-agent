@@ -40,8 +40,9 @@ async def start_sandbox(user_id: str, username: str) -> dict:
                 f"{OPEN_SANDBOX_URL}/v1/sandboxes",
                 json={
                     "image": {"uri": "python:3.11-slim"},
-                    "entrypoint": ["/bin/bash"],
+                    "entrypoint": ["/bin/sh", "-c", "sleep infinity"],
                     "timeout": SANDBOX_TIMEOUT,
+                    "resourceLimits": {"cpu": "0.5", "memory": "512Mi"},
                     "metadata": {
                         "name": username,
                         "user_id": user_id,
