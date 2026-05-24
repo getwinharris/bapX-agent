@@ -251,35 +251,35 @@ class AdminActionResp(BaseModel):
     status: str
     message: str = ""
 
-# ── ALL providers ──
+# ── ALL providers (no hardcoded models — fetched LIVE after auth) ──
 ALL_PROVIDERS = {
     # API Key providers
-    "openai":     {"name": "OpenAI",          "auth": "api_key", "models": ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo","o1","o1-mini","o3-mini"], "base_url": "https://api.openai.com/v1"},
-    "anthropic":  {"name": "Anthropic",       "auth": "api_key", "models": ["claude-sonnet-4","claude-3.5-sonnet","claude-3-opus","claude-3-haiku"], "base_url": "https://api.anthropic.com"},
-    "google":     {"name": "Google Gemini",   "auth": "api_key", "models": ["gemini-2.0-flash","gemini-2.0-pro","gemini-1.5-pro","gemini-1.5-flash"], "base_url": "https://generativelanguage.googleapis.com/v1beta"},
-    "deepseek":   {"name": "DeepSeek",        "auth": "api_key", "models": ["deepseek-chat","deepseek-reasoner"], "base_url": "https://api.deepseek.com/v1"},
-    "openrouter": {"name": "OpenRouter",      "auth": "api_key", "models": ["openai/gpt-4o","openai/gpt-4o-mini","anthropic/claude-sonnet-4","google/gemini-2.0-flash","openrouter/auto"], "base_url": "https://openrouter.ai/api/v1"},
-    "xai":        {"name": "xAI Grok",        "auth": "api_key", "models": ["grok-2","grok-2-vision"], "base_url": "https://api.x.ai/v1"},
-    "groq":       {"name": "Groq",            "auth": "api_key", "models": ["llama-3.3-70b-versatile","mixtral-8x7b-32768","deepseek-r1-distill-llama-70b"], "base_url": "https://api.groq.com/openai/v1"},
-    "mistral":    {"name": "Mistral",         "auth": "api_key", "models": ["mistral-large-latest","mistral-small-latest","codestral-latest"], "base_url": "https://api.mistral.ai/v1"},
-    "together":   {"name": "Together AI",     "auth": "api_key", "models": ["meta-llama/Llama-3.3-70B-Instruct-Turbo","deepseek-ai/DeepSeek-R1"], "base_url": "https://api.together.xyz/v1"},
-    "cohere":     {"name": "Cohere",          "auth": "api_key", "models": ["command-r-plus","command-r"], "base_url": "https://api.cohere.com/v1"},
-    "perplexity": {"name": "Perplexity",      "auth": "api_key", "models": ["sonar-pro","sonar","sonar-deep-research"], "base_url": "https://api.perplexity.ai"},
-    "huggingface":{"name": "Hugging Face",    "auth": "api_key", "models": ["meta-llama/Llama-3.3-70B-Instruct"], "base_url": "https://api-inference.huggingface.co/v1"},
-    "minimax":    {"name": "MiniMax",         "auth": "api_key", "models": ["minimax-text-01"], "base_url": "https://api.minimax.chat/v1"},
-    "kimi":       {"name": "Kimi Moonshot",   "auth": "api_key", "models": ["moonshot-v1-8k","moonshot-v1-32k","moonshot-v1-128k"], "base_url": "https://api.moonshot.cn/v1"},
-    "xiaomi":     {"name": "Xiaomi MiMo",     "auth": "api_key", "models": ["mimo-pro"], "base_url": "https://api.mimo.one/v1"},
-    "zai":        {"name": "Z.AI GLM",        "auth": "api_key", "models": ["glm-4-plus","glm-4-flash"], "base_url": "https://open.bigmodel.cn/api/paas/v4"},
-    "dashscope":  {"name": "Alibaba DashScope","auth": "api_key", "models": ["qwen-plus","qwen-max","qwen-turbo"], "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
-    "stepfun":    {"name": "StepFun",         "auth": "api_key", "models": ["step-1-8k","step-2-16k"], "base_url": "https://api.stepfun.com/v1"},
-    # OAuth providers — real ChatGPT & Claude login via device code flow
-    "openai-oauth":    {"name": "ChatGPT (OpenAI)",    "auth": "oauth", "models": ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo","o1","o1-mini","o3-mini"], "oauth_type": "openai_real"},
-    "anthropic-oauth": {"name": "Claude (Anthropic)",  "auth": "oauth", "models": ["claude-sonnet-4","claude-3.5-sonnet","claude-3-opus","claude-3-haiku","claude-3.5-haiku"], "oauth_type": "anthropic_real"},
-    "google-oauth":    {"name": "Google (OAuth)",      "auth": "oauth", "models": ["gemini-2.0-flash","gemini-2.0-pro","gemini-1.5-pro"], "oauth_type": "google_real"},
-    "nous-oauth":      {"name": "Nous Portal",         "auth": "oauth", "models": ["nous/hermes-4","nous/research-1"], "oauth_type": "nous"},
-    "qwen-oauth":      {"name": "Qwen (Alibaba)",      "auth": "oauth", "models": ["qwen-max","qwen-plus"], "oauth_type": "qwen"},
+    "openai":     {"name": "OpenAI",          "auth": "api_key", "base_url": "https://api.openai.com/v1"},
+    "anthropic":  {"name": "Anthropic",       "auth": "api_key", "base_url": "https://api.anthropic.com"},
+    "google":     {"name": "Google Gemini",   "auth": "api_key", "base_url": "https://generativelanguage.googleapis.com/v1beta"},
+    "deepseek":   {"name": "DeepSeek",        "auth": "api_key", "base_url": "https://api.deepseek.com/v1"},
+    "openrouter": {"name": "OpenRouter",      "auth": "api_key", "base_url": "https://openrouter.ai/api/v1"},
+    "xai":        {"name": "xAI Grok",        "auth": "api_key", "base_url": "https://api.x.ai/v1"},
+    "groq":       {"name": "Groq",            "auth": "api_key", "base_url": "https://api.groq.com/openai/v1"},
+    "mistral":    {"name": "Mistral",         "auth": "api_key", "base_url": "https://api.mistral.ai/v1"},
+    "together":   {"name": "Together AI",     "auth": "api_key", "base_url": "https://api.together.xyz/v1"},
+    "cohere":     {"name": "Cohere",          "auth": "api_key", "base_url": "https://api.cohere.com/v1"},
+    "perplexity": {"name": "Perplexity",      "auth": "api_key", "base_url": "https://api.perplexity.ai"},
+    "huggingface":{"name": "Hugging Face",    "auth": "api_key", "base_url": "https://api-inference.huggingface.co/v1"},
+    "minimax":    {"name": "MiniMax",         "auth": "api_key", "base_url": "https://api.minimax.chat/v1"},
+    "kimi":       {"name": "Kimi Moonshot",   "auth": "api_key", "base_url": "https://api.moonshot.cn/v1"},
+    "xiaomi":     {"name": "Xiaomi MiMo",     "auth": "api_key", "base_url": "https://api.mimo.one/v1"},
+    "zai":        {"name": "Z.AI GLM",        "auth": "api_key", "base_url": "https://open.bigmodel.cn/api/paas/v4"},
+    "dashscope":  {"name": "Alibaba DashScope","auth": "api_key", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
+    "stepfun":    {"name": "StepFun",         "auth": "api_key", "base_url": "https://api.stepfun.com/v1"},
+    # OAuth providers — models fetched live after auth
+    "openai-oauth":    {"name": "ChatGPT (OpenAI)",    "auth": "oauth", "oauth_type": "openai_real"},
+    "anthropic-oauth": {"name": "Claude (Anthropic)",  "auth": "oauth", "oauth_type": "anthropic_real"},
+    "google-oauth":    {"name": "Google (OAuth)",      "auth": "oauth", "oauth_type": "google_real"},
+    "nous-oauth":      {"name": "Nous Portal",         "auth": "oauth", "oauth_type": "nous"},
+    "qwen-oauth":      {"name": "Qwen (Alibaba)",      "auth": "oauth", "oauth_type": "qwen"},
     # Copilot / Token-based
-    "github-copilot":  {"name": "GitHub Copilot",      "auth": "copilot", "models": ["gpt-4o-copilot","claude-sonnet-copilot"], "oauth_type": "copilot"},
+    "github-copilot":  {"name": "GitHub Copilot",      "auth": "copilot", "oauth_type": "copilot"},
 }
 
 OAUTH_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "oauth"}
@@ -469,7 +469,6 @@ def list_providers():
             "id": pid,
             "name": p["name"],
             "auth": p["auth"],
-            "models": p.get("models", []),
             "oauth_type": p.get("oauth_type", None),
         }
         if p["auth"] == "oauth":
@@ -487,11 +486,6 @@ def list_providers():
 # ── User Settings ──
 @app.get("/api/user/profile")
 async def user_profile(user: dict = Depends(get_current_user)):
-    key = user["api_key"]
-    try:
-        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
-    except Exception:
-        oauth_tokens = {}
     try:
         skills_enabled = json.loads(user["skills_enabled"]) if user["skills_enabled"] else []
     except Exception:
@@ -504,13 +498,11 @@ async def user_profile(user: dict = Depends(get_current_user)):
         "age": user["age"], "nature": user["nature"],
         "agent_name": user["agent_name"], "bio": user["bio"],
         "soul_md": user["soul_md"],
-        "provider": user["provider"],
-        "api_key": ("••••" + key[-4:]) if key else "",
-        "model": user["model"],
-        "oauth_tokens": {k: "••••" + v[-4:] if len(v) > 8 else "••••" for k, v in oauth_tokens.items()},
         "skills_enabled": skills_enabled,
         "sandbox_status": sandbox_status.get("status", "none"),
-        "cached_models": json.loads(user["cached_models"]) if user.get("cached_models") else [],
+        # Credentials stored in sandbox ~/.bapx/ — not in DB
+        "has_api_key": False,
+        "connected_providers": [],
     }
 
 @app.put("/api/user/profile")
@@ -602,27 +594,42 @@ async def fetch_models_from_provider(req: ApiKeyUpdate, user: dict = Depends(get
 
     return {"models": model_list, "source": "live"}
 
-@app.put("/api/user/api-key")
-def update_api_key(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
-    updates = []
-    vals = []
-    if req.key is not None and req.key != "":
-        if len(req.key) < 8:
-            raise HTTPException(400, "Key must be 8+ chars")
-        if not req.key.startswith("••••"):
-            updates.append("api_key = ?"); vals.append(req.key)
-    if req.provider:
-        if req.provider not in ALL_PROVIDERS or ALL_PROVIDERS[req.provider]["auth"] not in ("api_key",):
-            raise HTTPException(400, "Invalid API key provider")
-        updates.append("provider = ?"); vals.append(req.provider)
-    if req.model is not None:
-        updates.append("model = ?"); vals.append(req.model)
-    if not updates:
-        raise HTTPException(400, "Nothing to update")
-    vals.append(user["id"])
-    conn.execute(f"UPDATE users SET {', '.join(updates)}, updated_at = datetime('now') WHERE id = ?", vals)
-    conn.commit()
-    return {"status": "ok"}
+@app.post("/api/user/api-key")
+async def update_api_key(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
+    """Save API key to user's sandbox ~/.bapx/config.toml — NOT in bapX DB."""
+    if not req.key or req.key == "":
+        raise HTTPException(400, "API key required")
+    if len(req.key) < 8:
+        raise HTTPException(400, "Key must be 8+ chars")
+    if not req.provider:
+        raise HTTPException(400, "Provider required")
+    if req.provider not in ALL_PROVIDERS:
+        raise HTTPException(400, f"Unknown provider: {req.provider}")
+
+    # Build config.toml content for Codex inside sandbox
+    prov_info = ALL_PROVIDERS[req.provider]
+    base_url = prov_info.get("base_url", "")
+    model_name = req.model or ""
+
+    # The API key goes to sandbox file, NOT bapX database
+    config_content = f'''# bapX config — written by bapX backend
+[model_providers]
+"{req.provider}" = {{ model = "{model_name}", base_url = "{base_url}" }}
+
+[auth]
+api_key = "{req.key}"
+'''
+    # Write to sandbox
+    try:
+        sb = await start_sandbox(user["id"], user["username"])
+        if not sb or not sb.get("sandbox_id"):
+            raise HTTPException(500, "No sandbox available")
+        await exec_in_sandbox(user["id"],
+            f"mkdir -p ~/.bapx && cat > ~/.bapx/config.toml << 'EOF'\n{config_content}\nEOF")
+    except Exception as e:
+        raise HTTPException(500, f"Failed to write config to sandbox: {str(e)[:200]}")
+
+    return {"status": "ok", "message": "Key saved to sandbox"}
 
 # ── OAuth Device Flow ──
 @app.post("/api/auth/oauth/start")

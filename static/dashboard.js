@@ -210,15 +210,39 @@ async function updateModels() {
   const sel = document.getElementById('provider-select');
   const prov = sel.value;
   const msel = document.getElementById('model-select');
-  msel.innerHTML = '<option value="">Select...</option>';
-  if (!prov) return;
-  const info = ALL_PROVIDERS.api_key.find(p => p.id === prov);
-  if (info?.models) {
-    info.models.forEach(m => {
+  msel.innerHTML = '<option value="">Select...</option><option value="" disabled>Enter API key first to fetch models</option>';
+  // Models come LIVE after user enters API key and clicks Connect
+}
+
+async function saveApiKey() {
+  const provider = document.getElementById('provider-select').value;
+  const key = document.getElementById('api-key-input').value;
+  document.getElementById('apikey-error').style.display = 'none';
+  document.getElementById('apikey-success').style.display = 'none';
+  const msel = document.getElementById('model-select');
+  msel.innerHTML = '<option value="">Fetching models...</option>';
+  try {
+    // First save the key, then fetch live models
+    const r1 = await api('/api/user/api-key', { method:'POST', body:JSON.stringify({provider,key}) });
+    // Fetch live models from provider API
+    const r2 = await api('/api/providers/fetch-models', { method:'POST', body:JSON.stringify({provider,key}) });
+    const d2 = await r2.json();
+    const models = d2.models || [];
+    msel.innerHTML = '<option value="">Select model...</option>';
+    models.forEach(m => {
       const o = document.createElement('option');
       o.value = m; o.textContent = m;
       msel.appendChild(o);
     });
+    document.getElementById('apikey-success').textContent = models.length > 0 ? `Connected! ${models.length} models found` : 'Connected!';
+    document.getElementById('apikey-success').style.display = 'block';
+    document.getElementById('api-key-input').value = '';
+    await loadProfile();
+    setTimeout(()=>document.getElementById('apikey-success').style.display='none', 3000);
+  } catch(e) {
+    msel.innerHTML = '<option value="">Select...</option>';
+    document.getElementById('apikey-error').textContent = e.message;
+    document.getElementById('apikey-error').style.display = 'block';
   }
 }
 
