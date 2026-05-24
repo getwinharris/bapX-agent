@@ -800,6 +800,9 @@ function addFlowTerm(cmd, output) {
   // Also echo to terminal
   addTermLine(cmd, 'cmd');
   if (output) addTermLine(output, 'out');
+  // Update sandbox status
+  setSandboxStatus('running');
+  setTimeout(() => setSandboxStatus('idle'), 2000);
 }
 
 function addFlowDiff(file, diffText) {

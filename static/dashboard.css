@@ -290,6 +290,8 @@ a{color:var(--accent);text-decoration:none}
   .chat-header{padding:.6rem .75rem}
   .chat-input-area{padding:.6rem .75rem}
   .chat-messages{padding:.75rem}
+  .rp-flow-list{padding:.3rem}
+  .flow-step{padding:.35rem .45rem;font-size:.6875rem}
 }
 @media(min-width:769px){
   .sidebar{width:48px}
