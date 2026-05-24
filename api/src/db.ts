@@ -1,27 +1,33 @@
 import Database from 'better-sqlite3'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DB_PATH = process.env.BAPX_DB_PATH || path.join(__dirname, '..', 'data', 'bapx.db')
-
-// Ensure data directory exists
-import fs from 'fs'
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
+try {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
+} catch (err) {
+  console.error(`Failed to create data directory: ${err}`)
+  process.exit(1)
+}
 
 const db = new Database(DB_PATH)
-
-// Enable WAL mode for concurrent access
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-// Create tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
+    age TEXT DEFAULT '',
+    nature TEXT DEFAULT '',
+    agent_name TEXT DEFAULT 'BapX',
+    bio TEXT DEFAULT '',
+    soul_md TEXT DEFAULT '',
     provider TEXT DEFAULT 'openai',
     api_key TEXT DEFAULT '',
     model TEXT DEFAULT '',
@@ -50,6 +56,7 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
 `)
 
 export default db

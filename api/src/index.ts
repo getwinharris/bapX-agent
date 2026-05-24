@@ -1,21 +1,32 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import rateLimit from '@fastify/rate-limit'
 import { authRoutes } from './routes/auth.js'
 import { userRoutes } from './routes/user.js'
 import { chatRoutes } from './routes/chat.js'
+import { sandboxRoutes } from './routes/sandbox.js'
 
 const PORT = parseInt(process.env.PORT || '3001', 10)
 const HOST = process.env.HOST || '0.0.0.0'
 
 const app = Fastify({ logger: true })
 
+// Rate limiting
+await app.register(rateLimit, {
+  max: 100,
+  timeWindow: '1 minute',
+  keyGenerator: (request) => request.ip,
+})
+
 // Plugins
-await app.register(cors, { origin: true, credentials: true })
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
+await app.register(cors, { origin: CORS_ORIGIN, credentials: true })
 
 // Routes
 await app.register(authRoutes, { prefix: '/api/auth' })
 await app.register(userRoutes, { prefix: '/api/user' })
 await app.register(chatRoutes, { prefix: '/api/chat' })
+await app.register(sandboxRoutes, { prefix: '/api/sandbox' })
 
 // Health check
 app.get('/api/health', async () => ({ status: 'ok', time: new Date().toISOString() }))

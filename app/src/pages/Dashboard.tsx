@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, FormEvent, useCallback } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { MessageSquare, Plus, Settings, LogOut, Send, User, ChevronLeft, ChevronRight, Terminal, FileText, Globe } from 'lucide-react'
+import { MessageSquare, Plus, Settings, LogOut, Send, User, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface Session {
   id: string; title: string; created_at: string; updated_at: string;
@@ -19,26 +19,32 @@ export default function Dashboard() {
   const [streaming, setStreaming] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userName, setUserName] = useState('')
+  const [hasApiKey, setHasApiKey] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+
+  const loadSessions = async () => {
+    const token = localStorage.getItem('bapx_token')
+    if (!token) return
+    const r = await fetch(`${API}/api/user/sessions`, { headers: { Authorization: `Bearer ${token}` } })
+    const d = await r.json()
+    setSessions(d.sessions || [])
+  }
 
   useEffect(() => {
     const token = localStorage.getItem('bapx_token')
     if (!token) { navigate('/login'); return }
     fetch(`${API}/api/user/profile`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(u => setUserName(u.name || u.email))
+      .then(r => r.json()).then(u => {
+        setUserName(u.name || u.email)
+        setHasApiKey(!!u.api_key)
+      })
       .catch(() => { localStorage.removeItem('bapx_token'); navigate('/login') })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load on mount
     loadSessions()
-  }, [])
+  }, [navigate])
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
-
-  const loadSessions = async () => {
-    const token = localStorage.getItem('bapx_token')
-    const r = await fetch(`${API}/api/user/sessions`, { headers: { Authorization: `Bearer ${token}` } })
-    const d = await r.json()
-    setSessions(d.sessions || [])
-  }
 
   const newChat = () => {
     setSessionId(null)
@@ -114,7 +120,7 @@ export default function Dashboard() {
                 return copy
               })
             }
-          } catch {}
+          } catch { /* skip malformed SSE */ }
         }
       }
     }
@@ -174,7 +180,7 @@ export default function Dashboard() {
           </div>
           <div className="flex-1" />
           <Link to="/settings" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
-            {!localStorage.getItem('bapx_token')?.startsWith('••••') && 'Configure API Key →'}
+            {hasApiKey ? 'API Key Configured ✓' : 'Configure API Key →'}
           </Link>
         </header>
 

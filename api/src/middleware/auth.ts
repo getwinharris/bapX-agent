@@ -1,7 +1,15 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'bapx-dev-secret-change-in-production'
+const JWT_SECRET: string = process.env.JWT_SECRET || ''
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is required. Set it to a strong random value.')
+  process.exit(1)
+}
+if (JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET must be at least 32 characters. Use: openssl rand -hex 32')
+  process.exit(1)
+}
 
 declare module 'fastify' {
   interface FastifyRequest {

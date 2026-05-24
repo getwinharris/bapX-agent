@@ -9,11 +9,15 @@ export default function Settings() {
   const [model, setModel] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [hasExistingKey, setHasExistingKey] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     api.user.profile().then(u => {
-      if (u.api_key) setApiKey(u.api_key)
+      if (u.api_key) {
+        setApiKey(u.api_key)
+        setHasExistingKey(true)
+      }
       if (u.provider) setProvider(u.provider)
       if (u.model) setModel(u.model)
     }).catch(() => {})
@@ -23,11 +27,28 @@ export default function Settings() {
     setSaving(true)
     setSaved(false)
     try {
-      await api.user.updateApiKey(provider, apiKey, model)
+      // Only send the API key if the user actually typed something new
+      // The masked "••••abcd" value means they didn't change it
+      const keyToSend = hasExistingKey && apiKey.startsWith('••••') ? undefined : apiKey
+      await api.user.updateApiKey(provider, keyToSend, model)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-    } catch {}
+      // Re-fetch profile to get fresh masked key
+      const profile = await api.user.profile()
+      if (profile.api_key) {
+        setApiKey(profile.api_key)
+        setHasExistingKey(true)
+      }
+    } catch { /* noop */ }
     setSaving(false)
+  }
+
+  const handleKeyChange = (value: string) => {
+    setApiKey(value)
+    // If user clears the field or types something different from masked, mark as changed
+    if (value === '' || !value.startsWith('••••')) {
+      setHasExistingKey(false)
+    }
   }
 
   const handleLogout = () => {
@@ -52,6 +73,9 @@ export default function Settings() {
             <Key size={16} className="text-[#9651b8]" />
             API Key
           </div>
+          {hasExistingKey && (
+            <p className="text-xs text-emerald-400">✓ API key is configured. Enter a new key below to change it.</p>
+          )}
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Provider</label>
             <select value={provider} onChange={e => setProvider(e.target.value)}
@@ -66,7 +90,8 @@ export default function Settings() {
           <div>
             <label className="text-xs text-gray-400 mb-1 block">API Key</label>
             <input type="password" className="input font-mono text-xs"
-              placeholder="sk-..." value={apiKey} onChange={e => setApiKey(e.target.value)} />
+              placeholder={hasExistingKey ? '•••••••• (key configured)' : 'sk-...'}
+              value={apiKey} onChange={e => handleKeyChange(e.target.value)} />
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block flex items-center gap-1">
