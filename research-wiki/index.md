@@ -44,3 +44,29 @@
 - **layout** — layout-comparison (1)
 - **onboarding** — onboarding-flow, manus-vs-codex-onboarding (2)
 - **comparison** — manus-vs-codex-ui, manus-vs-codex-onboarding (2)
+
+## Raw Sources
+
+| File | Description | Source | Date |
+|------|-------------|--------|------|
+| [manus-css-tokens.txt](raw/manus-css-tokens.txt) | 70+ CSS custom properties (complete palette) | Live manus.im browser console | 2026-05-24 |
+| [manus-page-structure.txt](raw/manus-page-structure.txt) | Full page layout structure + design tokens | Live manus.im inspection | 2026-05-24 |
+| [manus-feature-inventory.txt](raw/manus-feature-inventory.txt) | 50+ feature catalog from docs index | manus.im/docs/llms.txt | 2026-05-24 |
+| [codex-design-notes.txt](raw/codex-design-notes.txt) | macOS app layout architecture + components | OpenAI Codex SDK + implementation | 2026-05-24 |
+| [codex-tui-architecture.md](raw/codex-tui-architecture.md) | Complete TUI component tree (356 lines) | /root/Dev/codex/codex-rs/tui/ source | 2026-05-24 |
+| [codex-brand-assets.md](raw/codex-brand-assets.md) | Brand colors, splash, pets, CLI banner | /root/Dev/codex/ source inspection | 2026-05-24 |
+| [manus-im-homepage.png](raw/manus-im-homepage.png) | Screenshot of live homepage | Live https://manus.im | 2026-05-24 |
+| [manus-im-landing.png](raw/manus-im-landing.png) | Screenshot of landing page | Live https://manus.im | 2026-05-24 |
+
+## Coverage Matrix
+
+| Component | Manus.im | Codex macOS | Raw Evidence |
+|-----------|----------|-------------|-------------|
+| Color palette | ✅ Full (70+ vars) | ✅ Full (ANSI + hex) | CSS tokens, brand assets |
+| Typography | ✅ Libre Baskerville + system ui | ✅ Inter + system | Design system pages |
+| Layout | ✅ 3-column docs page | ✅ 4-zone TUI layout | Layout comparison, TUI arch |
+| Navigation | ✅ Top nav bar with dropdowns | ✅ TUI sidebar | Page structure, TUI arch |
+| Search/Input | ✅ Hero search bar | ✅ Chat composer | Page structure, TUI arch |
+| Components | ✅ Buttons, cards, footer | ✅ History cells, diffs, popups | All concept pages |
+| Animations | ✅ bprogress, fadeIn | ✅ Terminal spinner, pets | Design system pages |
+| Onboarding | ✅ Hero-driven flow | ✅ Empty state + slash cmds | Onboarding flow page |
