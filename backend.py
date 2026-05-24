@@ -3,7 +3,7 @@ bapX Backend — Python FastAPI
 All Hermes model auth methods (API key + OAuth login for ChatGPT/Claude/Grok/Gemini/etc.)
 All default skills from Hermes
 """
-import os, uuid, json, sqlite3, hashlib, hmac, time, httpx, asyncio
+import os, uuid, json, sqlite3, hashlib, hmac, time, httpx, asyncio, tempfile
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -40,6 +40,9 @@ conn.execute("PRAGMA foreign_keys=ON")
 conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL DEFAULT '', email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, age TEXT DEFAULT '', nature TEXT DEFAULT '', agent_name TEXT DEFAULT 'BapX', bio TEXT DEFAULT '', soul_md TEXT DEFAULT '', api_key TEXT DEFAULT '', provider TEXT DEFAULT 'openai', model TEXT DEFAULT '', oauth_tokens TEXT DEFAULT '{}', skills_enabled TEXT DEFAULT '[]', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))")
 conn.execute("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT DEFAULT 'New Chat', messages TEXT DEFAULT '[]', created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
 conn.execute("CREATE TABLE IF NOT EXISTS oauth_flows (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL, device_code TEXT NOT NULL, user_code TEXT NOT NULL, verification_uri TEXT NOT NULL, status TEXT DEFAULT 'pending', expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
+conn.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, session_id TEXT NOT NULL DEFAULT '', key TEXT NOT NULL, value TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id)")
 conn.commit()
 
 # ── FastAPI App ──
@@ -114,6 +117,14 @@ class SkillsUpdate(BaseModel):
 class ChatSend(BaseModel):
     message: str
     session_id: Optional[str] = None
+
+class TTSReq(BaseModel):
+    text: str
+
+class MemorySave(BaseModel):
+    key: str
+    value: str
+    session_id: str = ""
 
 # ── ALL providers (matching Hermes) ──
 ALL_PROVIDERS = {
@@ -633,6 +644,63 @@ def get_session(session_id: str, user: dict = Depends(get_current_user)):
     if not session:
         raise HTTPException(404, "Session not found")
     return dict(session)
+
+# ── TTS ──
+TTS_ENGINE = None
+
+def get_tts_engine():
+    global TTS_ENGINE
+    if TTS_ENGINE is None:
+        from kittentts import KittenTTS
+        TTS_ENGINE = KittenTTS()
+    return TTS_ENGINE
+
+@app.post("/api/tts")
+async def text_to_speech(req: TTSReq):
+    """Generate TTS audio from text using KittenTTS."""
+    if not req.text or not req.text.strip():
+        raise HTTPException(400, "Text is required")
+    text = req.text.strip()[:2000]  # Cap length
+    try:
+        tts = get_tts_engine()
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+        tts.generate_to_file(text, tmp_path)
+        return FileResponse(tmp_path, media_type="audio/wav", filename="tts.wav",
+                            headers={"Content-Disposition": "inline"})
+    except Exception as e:
+        raise HTTPException(500, f"TTS generation failed: {str(e)}")
+
+# ── Cross-session Memory ──
+@app.post("/api/memory/save")
+def memory_save(req: MemorySave, user: dict = Depends(get_current_user)):
+    """Save a key-value memory for cross-session recall."""
+    if not req.key or not req.key.strip():
+        raise HTTPException(400, "Key is required")
+    if not req.value or not req.value.strip():
+        raise HTTPException(400, "Value is required")
+    conn.execute(
+        "INSERT INTO memories (user_id, session_id, key, value) VALUES (?, ?, ?, ?)",
+        (user["id"], req.session_id, req.key.strip(), req.value.strip()),
+    )
+    conn.commit()
+    return {"status": "ok"}
+
+@app.get("/api/memory")
+def memory_get(session_id: str = "", user: dict = Depends(get_current_user)):
+    """Get stored memories, optionally filtered by session_id."""
+    if session_id:
+        rows = conn.execute(
+            "SELECT key, value, created_at FROM memories WHERE user_id = ? AND session_id = ? ORDER BY created_at DESC",
+            (user["id"], session_id),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT key, value, session_id, created_at FROM memories WHERE user_id = ? ORDER BY created_at DESC LIMIT 100",
+            (user["id"],),
+        ).fetchall()
+    return {"memories": [dict(r) for r in rows]}
 
 # ── Health ──
 @app.get("/health")
