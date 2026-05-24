@@ -1,7 +1,7 @@
 # bapX — Browser-Based AI Agent Platform
 
 ## Project Objective
-Build **bapX** (bapx.in) — a browser-only AI agent platform where users authenticate with their own model accounts (ChatGPT, Claude, API keys, etc.) and get an OpenAI-compatible endpoint that routes to their connected models. Users also get a sandboxed Codex CLI agent, persistent memory, and a library of default skills from Hermes.
+Build **bapX** (bapx.in) — a browser-only AI agent platform where users authenticate with their own model accounts (ChatGPT, Claude, API keys, etc.) and get an OpenAI-compatible endpoint that routes to their connected models. Users also get a sandboxed Codex CLI agent, persistent memory, and a library of built-in skills.
 
 ## Stack
 - **Backend**: Python FastAPI on port 7654 (`main:app`)
@@ -17,7 +17,7 @@ Build **bapX** (bapx.in) — a browser-only AI agent platform where users authen
 - Python: FastAPI patterns, async endpoints, `Depends(get_current_user)` for auth
 - Frontend: Vanilla JS, no frameworks, CSS custom properties
 - All routes in `backend.py` (single-file backend, ~1100 lines)
-- Skills loaded from `data/skills/` + `/usr/local/lib/hermes-agent/skills/`
+- Skills loaded from `data/skills/`
 - When you add a new model provider, add to `ALL_PROVIDERS` dict + `OAUTH_CONFIGS` if OAuth
 
 ## Current State (May 2026)
@@ -28,7 +28,7 @@ Build **bapX** (bapx.in) — a browser-only AI agent platform where users authen
 - **Providers**: 18 API key providers + 5 OAuth providers (ChatGPT, Claude, Google, Nous, Qwen) + 1 Copilot
 - **Proxy**: `/v1/chat/completions` — OpenAI-compatible endpoint that routes to user's connected model
 - **Models**: `/v1/models` and `/v1/user/models` endpoints
-- **Skills**: 89 default skills loaded from Hermes + user-created
+- **Skills**: Built-in skills loaded from data/skills + user-created
 - **Chat**: Streaming chat via agent orchestrator + sandbox
 - **Sandbox**: Per-user OpenSandbox Docker containers
 - **Mobile**: Responsive sidebar (48px icon rail, expands on tap)

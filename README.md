@@ -33,7 +33,7 @@ All connected models are exposed through bapx.in's OpenAI-compatible endpoint at
 
 ## Skills
 
-- 89 default skills loaded from Hermes (22 categories)
+- 10+ built-in skills across key categories
 - User-created skills from sandbox, browsable and toggleable in Settings → Skills tab
 - Users enable/disable skills per-session
 - Custom MCPs installed via sandbox

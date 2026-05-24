@@ -344,7 +344,7 @@ OAUTH_CONFIGS = {
 }
 
 # ── Skills loader ──
-# Only load bapX-specific skills from our own directory, NOT Hermes global skills
+# Only load bapX-specific skills
 def load_default_skills() -> list[dict]:
     """Load all SKILL.md files from bapX skills directory only."""
     skills = []
