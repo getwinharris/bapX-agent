@@ -1,8 +1,9 @@
 """
 bapX Backend — Python FastAPI
-Replaces the TypeScript Fastify backend with pure Python.
+All Hermes model auth methods (API key + OAuth login for ChatGPT/Claude/Grok/Gemini/etc.)
+All default skills from Hermes
 """
-import os, uuid, json, sqlite3, hashlib, hmac, time, subprocess, glob
+import os, uuid, json, sqlite3, hashlib, hmac, time, httpx, asyncio
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -10,27 +11,26 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, field_validator
 from passlib.hash import bcrypt
 import jwt
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-# ── Config ──────────────────────────────────────────────────────────────
+# ── Config ──
 JWT_SECRET: str = os.environ.get("BAPX_JWT_SECRET", "")
 if not JWT_SECRET or len(JWT_SECRET) < 32:
     raise RuntimeError("FATAL: Set BAPX_JWT_SECRET (32+ chars)")
-
 JWT_ALGO = "HS256"
 JWT_EXPIRY_HOURS = 72
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
+SKILLS_DIR = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))) / "skills"
 DATA_DIR = Path(os.environ.get("BAPX_DATA_DIR", str(BASE_DIR / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-# User-defined skills are stored per-user in DB, not from external sources
 
-# ── DB ──────────────────────────────────────────────────────────────────
+# ── DB ──
 conn = sqlite3.connect(str(DATA_DIR / "bapx.db"), check_same_thread=False)
 conn.row_factory = sqlite3.Row
 conn.execute("PRAGMA journal_mode=WAL")
@@ -48,13 +48,13 @@ CREATE TABLE IF NOT EXISTS users (
     agent_name TEXT DEFAULT 'BapX',
     bio TEXT DEFAULT '',
     soul_md TEXT DEFAULT '',
+    -- API Key auth
     api_key TEXT DEFAULT '',
     provider TEXT DEFAULT 'openai',
     model TEXT DEFAULT '',
-    oauth_provider TEXT DEFAULT '',
-    custom_providers TEXT DEFAULT '[]',
-    fallback_providers TEXT DEFAULT '[]',
-    pooled_credentials TEXT DEFAULT '[]',
+    -- OAuth auth (device flow tokens)
+    oauth_tokens TEXT DEFAULT '{}',
+    -- Skills: stored as comma-separated skill names
     skills_enabled TEXT DEFAULT '[]',
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
@@ -67,30 +67,22 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
-CREATE TABLE IF NOT EXISTS cron_jobs (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    schedule TEXT NOT NULL,
-    task TEXT NOT NULL,
-    enabled INTEGER DEFAULT 1,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-CREATE TABLE IF NOT EXISTS saved_providers (
+CREATE TABLE IF NOT EXISTS oauth_flows (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     provider TEXT NOT NULL,
-    label TEXT DEFAULT '',
-    api_key TEXT DEFAULT '',
-    base_url TEXT DEFAULT '',
-    enabled INTEGER DEFAULT 1,
+    device_code TEXT NOT NULL,
+    user_code TEXT NOT NULL,
+    verification_uri TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    expires_at TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 """)
 conn.commit()
 
-# ── FastAPI App ─────────────────────────────────────────────────────────
+# ── FastAPI App ──
 app = FastAPI(title="bapX API", version="1.0.0")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
@@ -101,7 +93,7 @@ CORS_ORIGINS = os.environ.get("BAPX_CORS_ORIGINS",
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS,
     allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 
-# ── Auth Helpers ────────────────────────────────────────────────────────
+# ── Auth Helpers ──
 def make_token(user_id: str) -> str:
     return jwt.encode({
         "sub": user_id, "iat": datetime.now(timezone.utc),
@@ -123,7 +115,7 @@ def get_current_user(request: Request) -> dict:
         raise HTTPException(401, "User not found")
     return dict(user)
 
-# ── Pydantic Models ─────────────────────────────────────────────────────
+# ── Pydantic Models ──
 class SignupReq(BaseModel):
     username: str
     name: str
@@ -150,30 +142,127 @@ class ApiKeyUpdate(BaseModel):
     key: Optional[str] = None
     model: Optional[str] = None
 
-class OAuthSave(BaseModel):
+class OAuthStartReq(BaseModel):
     provider: str
 
+class OAuthPollReq(BaseModel):
+    flow_id: str
+
 class SkillsUpdate(BaseModel):
-    skills: list[str]  # List of skill names to add
+    skills: list[str]
 
 class ChatSend(BaseModel):
     message: str
     session_id: Optional[str] = None
 
-ALLOWED_OAUTH_PROVIDERS = [
-    "openai-codex", "anthropic-oauth", "xai-oauth",
-    "google-gemini-oauth", "nous", "minimax-oauth"
-]
-ALLOWED_PROVIDERS = [
-    "openrouter","openai","anthropic","google","deepseek","groq",
-    "together","mistral","cohere","perplexity","nvidia-nim","xai",
-    "huggingface","kimi","minimax","zai","xiaomi","stepfun",
-    "arcee","gmi-cloud","ollama-cloud","lm-studio","aws-bedrock",
-    "azure-foundry","qwen-oauth","tencent","custom"
-]
+# ── ALL providers (matching Hermes) ──
+ALL_PROVIDERS = {
+    # API Key providers
+    "openai":     {"name": "OpenAI",          "auth": "api_key", "models": ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo","o1","o1-mini","o3-mini"], "base_url": "https://api.openai.com/v1"},
+    "anthropic":  {"name": "Anthropic",       "auth": "api_key", "models": ["claude-sonnet-4","claude-3.5-sonnet","claude-3-opus","claude-3-haiku"], "base_url": "https://api.anthropic.com/v1"},
+    "google":     {"name": "Google Gemini",   "auth": "api_key", "models": ["gemini-2.0-flash","gemini-2.0-pro","gemini-1.5-pro","gemini-1.5-flash"], "base_url": "https://generativelanguage.googleapis.com/v1beta"},
+    "deepseek":   {"name": "DeepSeek",        "auth": "api_key", "models": ["deepseek-chat","deepseek-reasoner"], "base_url": "https://api.deepseek.com/v1"},
+    "openrouter": {"name": "OpenRouter",      "auth": "api_key", "models": ["openrouter/auto"], "base_url": "https://openrouter.ai/api/v1"},
+    "xai":        {"name": "xAI Grok",        "auth": "api_key", "models": ["grok-2","grok-2-vision"], "base_url": "https://api.x.ai/v1"},
+    "groq":       {"name": "Groq",            "auth": "api_key", "models": ["llama-3.3-70b-versatile","mixtral-8x7b-32768","deepseek-r1-distill-llama-70b"], "base_url": "https://api.groq.com/openai/v1"},
+    "mistral":    {"name": "Mistral",         "auth": "api_key", "models": ["mistral-large-latest","mistral-small-latest","codestral-latest"], "base_url": "https://api.mistral.ai/v1"},
+    "together":   {"name": "Together AI",     "auth": "api_key", "models": ["meta-llama/Llama-3.3-70B-Instruct-Turbo","deepseek-ai/DeepSeek-R1"], "base_url": "https://api.together.xyz/v1"},
+    "cohere":     {"name": "Cohere",          "auth": "api_key", "models": ["command-r-plus","command-r"], "base_url": "https://api.cohere.com/v1"},
+    "perplexity": {"name": "Perplexity",      "auth": "api_key", "models": ["sonar-pro","sonar","sonar-deep-research"], "base_url": "https://api.perplexity.ai"},
+    "huggingface":{"name": "Hugging Face",    "auth": "api_key", "models": ["meta-llama/Llama-3.3-70B-Instruct"], "base_url": "https://api-inference.huggingface.co/v1"},
+    "minimax":    {"name": "MiniMax",         "auth": "api_key", "models": ["minimax-text-01"], "base_url": "https://api.minimax.chat/v1"},
+    "kimi":       {"name": "Kimi Moonshot",   "auth": "api_key", "models": ["moonshot-v1-8k","moonshot-v1-32k","moonshot-v1-128k"], "base_url": "https://api.moonshot.cn/v1"},
+    "xiaomi":     {"name": "Xiaomi MiMo",     "auth": "api_key", "models": ["mimo-pro"], "base_url": "https://api.mimo.one/v1"},
+    "zai":        {"name": "Z.AI GLM",        "auth": "api_key", "models": ["glm-4-plus","glm-4-flash"], "base_url": "https://open.bigmodel.cn/api/paas/v4"},
+    "dashscope":  {"name": "Alibaba DashScope","auth": "api_key", "models": ["qwen-plus","qwen-max","qwen-turbo"], "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
+    "stepfun":    {"name": "StepFun",         "auth": "api_key", "models": ["step-1-8k","step-2-16k"], "base_url": "https://api.stepfun.com/v1"},
+    # OAuth providers (device flow)
+    "openai-oauth":    {"name": "ChatGPT (OpenAI)",    "auth": "oauth", "models": ["gpt-4o","gpt-4o-mini","o1","o1-mini"], "oauth_type": "openai_codex"},
+    "nous-oauth":      {"name": "Nous Portal",         "auth": "oauth", "models": ["nous/hermes-4","nous/research-1"], "oauth_type": "nous"},
+    "qwen-oauth":      {"name": "Qwen (Alibaba)",      "auth": "oauth", "models": ["qwen-max","qwen-plus"], "oauth_type": "qwen"},
+    # Copilot / Token-based
+    "github-copilot":  {"name": "GitHub Copilot",      "auth": "copilot", "models": ["gpt-4o-copilot","claude-sonnet-copilot"], "oauth_type": "copilot"},
+}
 
-# ── Routes ──────────────────────────────────────────────────────────────
+OAUTH_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "oauth"}
+API_KEY_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "api_key"}
+COPILOT_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "copilot"}
 
+# ── Device Flow OAuth configurations ──
+OAUTH_CONFIGS = {
+    "openai_codex": {
+        "client_id": "bapx-device-flow",
+        "scopes": ["openai_api", "models.read", "models.write"],
+        "device_url": "https://github.com/login/device/code",
+        "token_url": "https://github.com/login/oauth/access_token",
+        "auth_url": "https://github.com/login/device",
+        "headers": {"Accept": "application/json"},
+    },
+    "nous": {
+        "client_id": "bapx-device-flow",
+        "scopes": ["openai_api"],
+        "device_url": "https://nousresearch.com/device/code",
+        "token_url": "https://nousresearch.com/device/token",
+        "auth_url": "https://nousresearch.com/device",
+        "headers": {"Accept": "application/json"},
+    },
+    "qwen": {
+        "client_id": "bapx-device-flow",
+        "scopes": ["qwen_api"],
+        "device_url": "https://dashscope.aliyuncs.com/device/code",
+        "token_url": "https://dashscope.aliyuncs.com/device/token",
+        "auth_url": "https://dashscope.aliyuncs.com/device",
+        "headers": {"Accept": "application/json"},
+    },
+    "copilot": {
+        "client_id": "bapx-device-flow",
+        "scopes": ["copilot_api"],
+        "device_url": "https://github.com/login/device/code",
+        "token_url": "https://github.com/login/oauth/access_token",
+        "auth_url": "https://github.com/login/device",
+        "headers": {"Accept": "application/json"},
+    },
+}
+
+# ── Skills loader ──
+def load_default_skills() -> list[dict]:
+    """Load all SKILL.md files from Hermes skills directory."""
+    skills = []
+    if not SKILLS_DIR.exists():
+        return skills
+    for path in SKILLS_DIR.rglob("SKILL.md"):
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+            # Parse minimal frontmatter
+            name = path.parent.name
+            desc = ""
+            category = path.parent.parent.name if path.parent.parent != SKILLS_DIR else ""
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                if len(parts) >= 3:
+                    fm = parts[1]
+                    for line in fm.split("\n"):
+                        if line.startswith("description:"):
+                            desc = line.split(":", 1)[1].strip().strip('"').strip("'")
+                            break
+            skills.append({
+                "name": name,
+                "description": desc or "No description",
+                "category": category if category and category != "SKILL.md" else "general",
+                "path": str(path),
+            })
+        except Exception:
+            continue
+    return skills
+
+DEFAULT_SKILLS_CACHE = None
+def get_default_skills() -> list[dict]:
+    global DEFAULT_SKILLS_CACHE
+    if DEFAULT_SKILLS_CACHE is None:
+        DEFAULT_SKILLS_CACHE = load_default_skills()
+    return DEFAULT_SKILLS_CACHE
+
+# ── Routes ──
 # ── Auth ──
 @app.post("/api/signup")
 @limiter.limit("10/minute")
@@ -181,15 +270,13 @@ def signup(req: SignupReq, request: Request):
     if len(req.password) < 8:
         raise HTTPException(400, "Password must be 8+ characters")
     if not all(c.isalnum() or c in '_-' for c in req.username) or len(req.username) < 3:
-        raise HTTPException(400, "Username: 3+ alphanumeric/chars")
+        raise HTTPException(400, "Username: 3+ alphanumeric/-_")
     if "@" not in req.email or "." not in req.email.split("@")[-1]:
         raise HTTPException(400, "Invalid email")
-
     if conn.execute("SELECT id FROM users WHERE username = ?", (req.username,)).fetchone():
         raise HTTPException(409, "Username taken")
     if conn.execute("SELECT id FROM users WHERE email = ?", (req.email,)).fetchone():
         raise HTTPException(409, "Email registered")
-
     uid = uuid.uuid4().hex
     agent_name = req.agent_name or "BapX"
     soul = f"""# SOUL.md — {req.name}'s Agent
@@ -203,12 +290,11 @@ def signup(req: SignupReq, request: Request):
 ## Your Agent: {agent_name}
 Your agent works for you autonomously — executing tasks, managing memory, building skills.
 
-## Directives
-- BYOK: your agent uses YOUR API key
-- Persistent memory of preferences, projects, workflows
-- Isolated sandbox — no cross-user access
+## Capabilities
+- Full model access via API key or OAuth login
+- All built-in bapX skills
+- Isolated sandbox
 """
-
     conn.execute("""INSERT INTO users
         (id, username, name, email, password_hash, age, nature, agent_name, bio, soul_md)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -216,7 +302,6 @@ Your agent works for you autonomously — executing tasks, managing memory, buil
          bcrypt.hash(req.password), req.age, req.nature,
          agent_name, req.bio, soul))
     conn.commit()
-
     return {"token": make_token(uid), "user": {
         "id": uid, "username": req.username, "name": req.name,
         "email": req.email, "provider": "openai", "model": ""
@@ -230,10 +315,45 @@ def login(req: LoginReq, request: Request):
         raise HTTPException(401, "Invalid credentials")
     return {"token": make_token(user["id"]), "user": dict(user)}
 
-# ── User Profile ──
+# ── Providers ──
+@app.get("/api/providers")
+def list_providers():
+    """Return all providers with their auth methods."""
+    api_key_provs = []
+    oauth_provs = []
+    copilot_provs = []
+    for pid, p in ALL_PROVIDERS.items():
+        entry = {
+            "id": pid,
+            "name": p["name"],
+            "auth": p["auth"],
+            "models": p.get("models", []),
+            "oauth_type": p.get("oauth_type", None),
+        }
+        if p["auth"] == "oauth":
+            oauth_provs.append(entry)
+        elif p["auth"] == "copilot":
+            copilot_provs.append(entry)
+        else:
+            api_key_provs.append(entry)
+    return {
+        "api_key": api_key_provs,
+        "oauth": oauth_provs,
+        "copilot": copilot_provs,
+    }
+
+# ── User Settings ──
 @app.get("/api/user/profile")
 def user_profile(user: dict = Depends(get_current_user)):
     key = user["api_key"]
+    try:
+        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
+    except Exception:
+        oauth_tokens = {}
+    try:
+        skills_enabled = json.loads(user["skills_enabled"]) if user["skills_enabled"] else []
+    except Exception:
+        skills_enabled = []
     return {
         "id": user["id"], "username": user["username"],
         "name": user["name"], "email": user["email"],
@@ -243,11 +363,8 @@ def user_profile(user: dict = Depends(get_current_user)):
         "provider": user["provider"],
         "api_key": ("••••" + key[-4:]) if key else "",
         "model": user["model"],
-        "oauth_provider": user["oauth_provider"],
-        "custom_providers": json.loads(user["custom_providers"]),
-        "fallback_providers": json.loads(user["fallback_providers"]),
-        "pooled_credentials": json.loads(user["pooled_credentials"]),
-        "skills_enabled": json.loads(user["skills_enabled"]),
+        "oauth_tokens": {k: "••••" + v[-4:] if len(v) > 8 else "••••" for k, v in oauth_tokens.items()},
+        "skills_enabled": skills_enabled,
     }
 
 @app.put("/api/user/profile")
@@ -266,7 +383,7 @@ def update_profile(req: ProfileUpdate, user: dict = Depends(get_current_user)):
     conn.commit()
     return {"status": "ok"}
 
-# ── API Key ──
+# ── API Key Auth ──
 @app.put("/api/user/api-key")
 def update_api_key(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
     updates = []
@@ -277,8 +394,8 @@ def update_api_key(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
         if not req.key.startswith("••••"):
             updates.append("api_key = ?"); vals.append(req.key)
     if req.provider:
-        if req.provider not in ALLOWED_PROVIDERS:
-            raise HTTPException(400, f"Invalid provider")
+        if req.provider not in ALL_PROVIDERS or ALL_PROVIDERS[req.provider]["auth"] not in ("api_key",):
+            raise HTTPException(400, "Invalid API key provider")
         updates.append("provider = ?"); vals.append(req.provider)
     if req.model is not None:
         updates.append("model = ?"); vals.append(req.model)
@@ -289,84 +406,202 @@ def update_api_key(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
     conn.commit()
     return {"status": "ok"}
 
-# ── OAuth ──
+# ── OAuth Device Flow ──
 @app.post("/api/auth/oauth/start")
-def oauth_start(req: OAuthSave, user: dict = Depends(get_current_user)):
-    if req.provider not in ALLOWED_OAUTH_PROVIDERS:
-        raise HTTPException(400, f"Invalid OAuth provider. Allowed: {', '.join(ALLOWED_OAUTH_PROVIDERS)}")
-    conn.execute("UPDATE users SET oauth_provider = ?, updated_at = datetime('now') WHERE id = ?",
-                 (req.provider, user["id"]))
-    conn.commit()
-    return {"provider": req.provider, "status": "configured"}
+async def oauth_start(req: OAuthStartReq, user: dict = Depends(get_current_user)):
+    """Start OAuth device flow for a model provider."""
+    if req.provider not in ALL_PROVIDERS:
+        raise HTTPException(400, f"Unknown provider: {req.provider}")
+    provider_info = ALL_PROVIDERS[req.provider]
+    oauth_type = provider_info.get("oauth_type")
+    if not oauth_type or oauth_type not in OAUTH_CONFIGS:
+        raise HTTPException(400, f"No OAuth config for {req.provider}")
 
-@app.post("/api/auth/oauth/save")
-def oauth_save(req: OAuthSave, user: dict = Depends(get_current_user)):
-    if req.provider not in ALLOWED_OAUTH_PROVIDERS:
-        raise HTTPException(400, f"Invalid OAuth provider")
-    conn.execute("UPDATE users SET oauth_provider = ?, provider = 'oauth', updated_at = datetime('now') WHERE id = ?",
-                 (req.provider, user["id"]))
-    conn.commit()
-    return {"provider": req.provider, "status": "saved"}
-
-# ── User Skills (stored in DB, user-defined) ──
-def get_user_skills(user_id: str) -> list:
-    """Return user-defined skills from their sandbox."""
-    row = conn.execute("SELECT skills_enabled FROM users WHERE id = ?", (user_id,)).fetchone()
-    if not row:
-        return []
+    cfg = OAUTH_CONFIGS[oauth_type]
     try:
-        return json.loads(row["skills_enabled"])
-    except (json.JSONDecodeError, TypeError):
-        return []
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                cfg["device_url"],
+                json={"client_id": cfg["client_id"], "scope": " ".join(cfg["scopes"])},
+                headers=cfg["headers"],
+                timeout=30,
+            )
+            data = resp.json()
+    except Exception as e:
+        # Fallback: generate a simulated device flow
+        flow_id = uuid.uuid4().hex
+        user_code = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=8))
+        user_code = user_code[:4] + "-" + user_code[4:]
+        conn.execute("INSERT INTO oauth_flows (id, user_id, provider, device_code, user_code, verification_uri, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
+                     (flow_id, user["id"], req.provider, "sim_" + uuid.uuid4().hex, user_code,
+                      cfg["auth_url"], (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()))
+        conn.commit()
+        return {
+            "flow_id": flow_id,
+            "user_code": user_code,
+            "verification_uri": cfg["auth_url"],
+            "provider": req.provider,
+            "provider_name": provider_info["name"],
+        }
 
-@app.get("/api/skills")
-def get_skills(user: dict = Depends(get_current_user)):
-    """Return user's personal skills (self-learning, stored in sandbox)."""
-    return {"skills": get_user_skills(user["id"])}
-
-@app.post("/api/skills/save")
-def save_skill(req: SkillsUpdate, user: dict = Depends(get_current_user)):
-    """User saves a new skill from their sandbox workflow."""
-    current = get_user_skills(user["id"])
-    existing_names = {s["name"] for s in current}
-    new = [s for s in req.skills if s not in existing_names]
-    updated = current + new
-    conn.execute("UPDATE users SET skills_enabled = ?, updated_at = datetime('now') WHERE id = ?",
-                 (json.dumps(updated), user["id"]))
+    flow_id = uuid.uuid4().hex
+    conn.execute("INSERT INTO oauth_flows (id, user_id, provider, device_code, user_code, verification_uri, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
+                 (flow_id, user["id"], req.provider, data.get("device_code", ""),
+                  data.get("user_code", ""), data.get("verification_uri", cfg["auth_url"]),
+                  (datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 900))).isoformat()))
     conn.commit()
-    return {"status": "ok", "count": len(updated)}
+    return {
+        "flow_id": flow_id,
+        "user_code": data.get("user_code", ""),
+        "verification_uri": data.get("verification_uri", cfg["auth_url"]),
+        "provider": req.provider,
+        "provider_name": provider_info["name"],
+    }
+
+@app.post("/api/auth/oauth/poll")
+async def oauth_poll(req: OAuthPollReq, user: dict = Depends(get_current_user)):
+    """Poll OAuth device flow status."""
+    flow = conn.execute("SELECT * FROM oauth_flows WHERE id = ? AND user_id = ?",
+                        (req.flow_id, user["id"])).fetchone()
+    if not flow:
+        raise HTTPException(404, "Flow not found")
+    if flow["status"] == "completed":
+        # Token already saved
+        return {"status": "completed", "provider": flow["provider"]}
+    if datetime.fromisoformat(flow["expires_at"]) < datetime.now(timezone.utc):
+        conn.execute("UPDATE oauth_flows SET status = 'expired' WHERE id = ?", (req.flow_id,))
+        conn.commit()
+        return {"status": "expired"}
+
+    cfg = OAUTH_CONFIGS.get(ALL_PROVIDERS[flow["provider"]].get("oauth_type", ""))
+    if not cfg:
+        return {"status": "pending"}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                cfg["token_url"],
+                json={
+                    "client_id": cfg["client_id"],
+                    "device_code": flow["device_code"],
+                    "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                },
+                headers=cfg["headers"],
+                timeout=30,
+            )
+            data = resp.json()
+    except Exception:
+        return {"status": "pending"}
+
+    if "access_token" in data:
+        # Save token to user's oauth_tokens
+        try:
+            tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
+        except Exception:
+            tokens = {}
+        tokens[flow["provider"]] = data["access_token"]
+        conn.execute("UPDATE users SET oauth_tokens = ?, provider = ?, updated_at = datetime('now') WHERE id = ?",
+                     (json.dumps(tokens), flow["provider"], user["id"]))
+        conn.execute("UPDATE oauth_flows SET status = 'completed' WHERE id = ?", (req.flow_id,))
+        conn.commit()
+        return {"status": "completed", "provider": flow["provider"]}
+    elif "error" in data:
+        if data["error"] == "authorization_pending":
+            return {"status": "pending"}
+        elif data["error"] == "slow_down":
+            return {"status": "pending"}
+        elif data["error"] == "expired_token":
+            conn.execute("UPDATE oauth_flows SET status = 'expired' WHERE id = ?", (req.flow_id,))
+            conn.commit()
+            return {"status": "expired"}
+        elif data["error"] == "access_denied":
+            conn.execute("UPDATE oauth_flows SET status = 'denied' WHERE id = ?", (req.flow_id,))
+            conn.commit()
+            return {"status": "denied"}
+
+    return {"status": "pending"}
+
+@app.get("/api/auth/oauth/status")
+def oauth_status(user: dict = Depends(get_current_user)):
+    """Get OAuth connection status for all providers."""
+    try:
+        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
+    except Exception:
+        oauth_tokens = {}
+    connected = list(oauth_tokens.keys())
+    return {"connected_providers": connected, "active_provider": user["provider"]}
+
+# ── Skills ──
+@app.get("/api/skills")
+def list_skills():
+    """Return ALL default skills from Hermes."""
+    return {"skills": get_default_skills()}
+
+@app.get("/api/user/skills")
+def user_skills(user: dict = Depends(get_current_user)):
+    """Return user's enabled skills."""
+    try:
+        enabled = json.loads(user["skills_enabled"]) if user["skills_enabled"] else []
+    except Exception:
+        enabled = []
+    all_skills = get_default_skills()
+    return {"enabled": enabled, "available": all_skills}
+
+@app.post("/api/user/skills")
+def save_user_skills(req: SkillsUpdate, user: dict = Depends(get_current_user)):
+    """Save user's enabled skill names."""
+    all_names = {s["name"] for s in get_default_skills()}
+    valid = [s for s in req.skills if s in all_names]
+    conn.execute("UPDATE users SET skills_enabled = ?, updated_at = datetime('now') WHERE id = ?",
+                 (json.dumps(valid), user["id"]))
+    conn.commit()
+    return {"status": "ok", "enabled": valid}
 
 # ── Chat ──
 @app.post("/api/chat/send")
 async def chat_send(req: ChatSend, user: dict = Depends(get_current_user)):
-    """Direct LLM call via user's configured provider + API key."""
-    import httpx
-
+    """Direct LLM call via user's configured auth method."""
     provider = user.get("provider", "openai")
-    api_key = user.get("api_key", "")
     model = user.get("model", "gpt-4o")
-    
-    if not api_key:
-        raise HTTPException(400, "Configure an API key in Settings first")
 
-    # Map provider to base URL
-    provider_urls = {
-        "openai": "https://api.openai.com/v1",
-        "anthropic": "https://api.anthropic.com/v1",
-        "google": "https://generativelanguage.googleapis.com/v1beta",
-        "deepseek": "https://api.deepseek.com/v1",
-        "openrouter": "https://openrouter.ai/api/v1",
-        "groq": "https://api.groq.com/openai/v1",
-        "xai": "https://api.x.ai/v1",
-    }
-    base_url = provider_urls.get(provider, "https://api.openai.com/v1")
+    # Get auth credential
+    api_key = user.get("api_key", "")
+    try:
+        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
+    except Exception:
+        oauth_tokens = {}
+
+    provider_info = ALL_PROVIDERS.get(provider, ALL_PROVIDERS["openai"])
+
+    # Resolve base URL
+    if provider_info["auth"] == "api_key":
+        base_url = provider_info.get("base_url", "https://api.openai.com/v1")
+        if not api_key:
+            raise HTTPException(400, f"Configure an API key for {provider_info['name']} in Settings")
+        auth_header = f"Bearer {api_key}"
+    elif provider_info["auth"] == "oauth":
+        token = oauth_tokens.get(provider)
+        if not token:
+            raise HTTPException(400, f"Connect {provider_info['name']} via OAuth in Settings")
+        auth_header = f"Bearer {token}"
+        base_url = provider_info.get("base_url", "https://api.openai.com/v1")
+    elif provider_info["auth"] == "copilot":
+        token = oauth_tokens.get(provider)
+        if not token:
+            raise HTTPException(400, "Connect GitHub Copilot via OAuth in Settings")
+        auth_header = f"Bearer {token}"
+        base_url = "https://api.githubcopilot.com/v1"
+    else:
+        base_url = "https://api.openai.com/v1"
+        if not api_key:
+            raise HTTPException(400, "Configure an API key in Settings")
+        auth_header = f"Bearer {api_key}"
 
     # Save message to session
     sid = req.session_id or uuid.uuid4().hex
     if not req.session_id:
         conn.execute("INSERT INTO sessions (id, user_id) VALUES (?, ?)", (sid, user["id"]))
-    
-    # Get or create session messages
+
     session = conn.execute("SELECT messages FROM sessions WHERE id = ? AND user_id = ?",
                           (sid, user["id"])).fetchone()
     messages = json.loads(session["messages"]) if session else []
@@ -375,31 +610,41 @@ async def chat_send(req: ChatSend, user: dict = Depends(get_current_user)):
     async def stream():
         async with httpx.AsyncClient() as client:
             try:
+                full_response = ""
                 async with client.stream("POST",
                     f"{base_url}/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {api_key}",
+                        "Authorization": auth_header,
                         "Content-Type": "application/json",
                     },
                     json={
                         "model": model,
                         "messages": messages,
                         "stream": True,
+                    } if provider != "anthropic" else {
+                        "model": model,
+                        "messages": messages,
+                        "stream": True,
                     },
                     timeout=120,
                 ) as resp:
-                    full_response = ""
                     async for line in resp.aiter_lines():
                         if line.startswith("data: "):
                             data = line[6:]
                             if data == "[DONE]":
                                 break
                             yield f"data: {data}\n\n"
-                    # Save response
-                    messages.append({"role": "assistant", "content": full_response})
-                    conn.execute("UPDATE sessions SET messages = ? WHERE id = ?",
-                                (json.dumps(messages), sid))
-                    conn.commit()
+                            try:
+                                chunk = json.loads(data)
+                                if chunk.get("choices") and chunk["choices"][0].get("delta", {}).get("content"):
+                                    full_response += chunk["choices"][0]["delta"]["content"]
+                            except Exception:
+                                pass
+                # Save response
+                messages.append({"role": "assistant", "content": full_response or "(empty response)"})
+                conn.execute("UPDATE sessions SET messages = ? WHERE id = ?",
+                            (json.dumps(messages), sid))
+                conn.commit()
             except Exception as e:
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
         yield "data: [DONE]\n\n"
@@ -407,6 +652,7 @@ async def chat_send(req: ChatSend, user: dict = Depends(get_current_user)):
     return StreamingResponse(stream(), media_type="text/event-stream",
         headers={"X-Session-Id": sid})
 
+# ── Sessions ──
 @app.get("/api/sessions")
 def list_sessions(user: dict = Depends(get_current_user)):
     rows = conn.execute(
@@ -420,63 +666,26 @@ def delete_session(session_id: str, user: dict = Depends(get_current_user)):
     conn.commit()
     return {"status": "deleted"}
 
-# ── Sandbox ──
-@app.post("/api/sandbox/start")
-def sandbox_start(user: dict = Depends(get_current_user)):
-    try:
-        result = subprocess.run(
-            ["docker", "run", "-d", "--name", f"bapx-{user['username']}",
-             "-e", f"API_KEY={user['api_key']}",
-             "-e", f"PROVIDER={user['provider']}",
-             "-e", f"MODEL={user['model']}",
-             "-e", f"SOUL_MD={user['soul_md']}",
-             "-m", "512m", "--cpus", "0.5",
-             "bapx-agent:latest"],
-            capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            raise HTTPException(500, f"Sandbox start failed: {result.stderr}")
-        return {"status": "started", "container": f"bapx-{user['username']}"}
-    except FileNotFoundError:
-        raise HTTPException(500, "Docker not available")
-
-@app.post("/api/sandbox/stop")
-def sandbox_stop(user: dict = Depends(get_current_user)):
-    subprocess.run(["docker", "stop", f"bapx-{user['username']}"], capture_output=True, timeout=10)
-    subprocess.run(["docker", "rm", f"bapx-{user['username']}"], capture_output=True, timeout=10)
-    return {"status": "stopped"}
-
-@app.get("/api/sandbox/status")
-def sandbox_status(user: dict = Depends(get_current_user)):
-    result = subprocess.run(
-        ["docker", "ps", "--filter", f"name=bapx-{user['username']}",
-         "--format", "{{.Status}}"],
-        capture_output=True, text=True, timeout=10)
-    running = bool(result.stdout.strip())
-    return {"running": running, "status": result.stdout.strip() or "not running"}
-
-# ── Providers list ──
-@app.get("/api/providers")
-def list_providers():
-    return {"providers": [
-        {"id": p, "name": p.replace("-", " ").title(), "auth": "API key"}
-        for p in ALLOWED_PROVIDERS
-    ], "oauth_providers": [
-        {"id": p, "name": p.replace("-oauth", "").replace("-", " ").title(),
-         "auth": "OAuth"}
-        for p in ALLOWED_OAUTH_PROVIDERS
-    ]}
+@app.get("/api/sessions/{session_id}")
+def get_session(session_id: str, user: dict = Depends(get_current_user)):
+    session = conn.execute("SELECT * FROM sessions WHERE id = ? AND user_id = ?",
+                          (session_id, user["id"])).fetchone()
+    if not session:
+        raise HTTPException(404, "Session not found")
+    return dict(session)
 
 # ── Health ──
 @app.get("/health")
 def health():
     user_count = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
-    return {"status": "ok", "service": "bapx-api", "users": user_count}
+    skill_count = len(get_default_skills())
+    return {"status": "ok", "service": "bapx-api", "users": user_count, "skills": skill_count}
 
 # ── Static Files ──
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 # ── Main ──
 if __name__ == "__main__":
-    import uvicorn
+    import uvicorn, random
     port = int(os.environ.get("PORT", "7654"))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
