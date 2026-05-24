@@ -4,52 +4,39 @@ import { execSync } from 'child_process'
 import db from '../db.js'
 import { authMiddleware } from '../middleware/auth.js'
 
-/**
- * In-memory cache for sandbox endpoint status.
- * TTL: 15 seconds — avoids 3 subprocess calls per /chat/send.
- */
+const OPEN_SANDBOX_URL = process.env.OPEN_SANDBOX_URL || 'http://127.0.0.1:8080'
+
+/** TTL for sandbox endpoint cache */
+const CACHE_TTL = 15_000
 const sandboxCache = new Map<string, { endpoint: string | null; ts: number }>()
-const SANDBOX_CACHE_TTL = 15_000 // 15 seconds
 
 /**
- * Get the sandbox agent endpoint for a user if their sandbox is running.
- * Results are cached in-memory to avoid subprocess overhead on every message.
+ * Check OpenSandbox server for a running sandbox for this user.
+ * Returns the agent endpoint URL if sandbox is running, null otherwise.
  */
 function getSandboxEndpoint(username: string): string | null {
-  // Check cache first
   const cached = sandboxCache.get(username)
-  if (cached && Date.now() - cached.ts < SANDBOX_CACHE_TTL) {
-    return cached.endpoint
-  }
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.endpoint
 
   try {
-    const containerName = `bapx-sandbox-${username}`
-    const status = execSync(
-      `docker ps --filter name=^/${containerName}$ --format '{{.Status}}'`,
-      { encoding: 'utf-8', timeout: 5_000 }
-    ).trim()
-    if (!status) {
+    const url = `${OPEN_SANDBOX_URL}/v1/sandboxes?metadata.name=${username}`
+    // Synchronous fetch via execSync as this is called sync
+    const res = execSync(`curl -sf "${url}"`, { encoding: 'utf-8', timeout: 5_000 }).trim()
+    if (!res) {
       sandboxCache.set(username, { endpoint: null, ts: Date.now() })
       return null
     }
-    const portStr = execSync(
-      `docker port ${containerName} 8765/tcp 2>/dev/null | head -1 | sed 's/.*://'`,
-      { encoding: 'utf-8', timeout: 5_000 }
-    ).trim()
-    if (!portStr) {
+    const data = JSON.parse(res)
+    const sandbox = Array.isArray(data) ? data[0] : data
+    if (!sandbox || sandbox.status?.state !== 'running') {
       sandboxCache.set(username, { endpoint: null, ts: Date.now() })
       return null
     }
-    // Verify agent is healthy (includes auth)
-    const internalKey = process.env.BAPX_INTERNAL_API_KEY || ''
-    const health = execSync(
-      `curl -sf -H "Authorization: Bearer ${internalKey}" http://127.0.0.1:${portStr}/health`,
-      { encoding: 'utf-8', timeout: 5_000 }
-    ).trim()
-    const endpoint = health ? `http://127.0.0.1:${portStr}` : null
+    // Get the sandbox agent port
+    const endpoint = sandbox.endpoint || `http://127.0.0.1:8765`
     sandboxCache.set(username, { endpoint, ts: Date.now() })
     return endpoint
-  } catch { /* sandbox not found or not responding — cache as null */
+  } catch {
     sandboxCache.set(username, { endpoint: null, ts: Date.now() })
     return null
   }
@@ -205,22 +192,52 @@ export async function chatRoutes(app: FastifyInstance) {
       const apiKey = user.api_key
       const model = user.model || 'gpt-4o'
 
+      // All provider API base URLs — matches agent-runner.py
+      const PROVIDER_URLS: Record<string, string> = {
+        'openrouter': 'https://openrouter.ai/api/v1/chat/completions',
+        'openai': 'https://api.openai.com/v1/chat/completions',
+        'anthropic': 'https://api.anthropic.com/v1/messages',
+        'google': '',
+        'deepseek': 'https://api.deepseek.com/v1/chat/completions',
+        'groq': 'https://api.groq.com/openai/v1/chat/completions',
+        'together': 'https://api.together.xyz/v1/chat/completions',
+        'mistral': 'https://api.mistral.ai/v1/chat/completions',
+        'cohere': 'https://api.cohere.ai/v1/chat/completions',
+        'perplexity': 'https://api.perplexity.ai/chat/completions',
+        'nvidia-nim': 'https://api.nvcf.nvidia.com/v1/chat/completions',
+        'xai': 'https://api.x.ai/v1/chat/completions',
+        'huggingface': 'https://api-inference.huggingface.co/v1/chat/completions',
+        'kimi': 'https://api.moonshot.cn/v1/chat/completions',
+        'minimax': 'https://api.minimaxi.com/v1/chat/completions',
+        'zai': 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+        'xiaomi': 'https://api.xiaomimimo.com/v1/chat/completions',
+        'stepfun': 'https://api.stepfun.com/v1/chat/completions',
+        'arcee': 'https://api.arcee.ai/v1/chat/completions',
+        'gmi-cloud': 'https://api.gmicloud.ai/v1/chat/completions',
+        'ollama-cloud': 'https://cloud.ollama.ai/v1/chat/completions',
+        'lm-studio': 'http://localhost:1234/v1/chat/completions',
+        'aws-bedrock': '',
+        'azure-foundry': 'https://ai.azure.com/v1/chat/completions',
+        'qwen-oauth': 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+        'tencent': 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions',
+      }
+
       let baseUrl: string
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
 
       if (provider === 'anthropic') {
         headers['x-api-key'] = apiKey
         headers['anthropic-version'] = '2023-06-01'
-        baseUrl = 'https://api.anthropic.com/v1/messages'
+        baseUrl = PROVIDER_URLS['anthropic']
       } else if (provider === 'google') {
         headers['x-goog-api-key'] = apiKey
         baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent`
-      } else {
-        // OpenAI / OpenRouter / Custom
-        baseUrl = provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions'
-          : provider === 'custom' ? (process.env.CUSTOM_BASE_URL || 'https://api.openai.com/v1')
-          : 'https://api.openai.com/v1/chat/completions'
+      } else if (provider === 'custom') {
+        baseUrl = process.env.CUSTOM_BASE_URL || 'https://api.openai.com/v1/chat/completions'
         headers['Authorization'] = `Bearer ${apiKey}`
+      } else {
+        baseUrl = PROVIDER_URLS[provider] || 'https://api.openai.com/v1/chat/completions'
+        if (baseUrl) headers['Authorization'] = `Bearer ${apiKey}`
       }
 
       const body = provider === 'anthropic' ? {

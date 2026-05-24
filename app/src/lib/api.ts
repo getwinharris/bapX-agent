@@ -86,8 +86,7 @@ function streamChat(
               callbacks.onError(parsed.error)
               return
             }
-          } catch {
-            // skip malformed SSE lines
+          } catch { console.warn('Malformed SSE line:', data); /* skip malformed SSE lines */
           }
         }
       }
@@ -112,6 +111,29 @@ export const api = {
     profile: () => request('/user/profile'),
     updateApiKey: (provider: string, key: string | undefined, model: string) =>
       request('/user/api-key', { method: 'PUT', body: JSON.stringify({ provider, key, model }) }),
+    saveOauth: (provider: string, token: string, refreshToken?: string, expiresAt?: string) =>
+      request('/user/oauth-login', { method: 'POST', body: JSON.stringify({ provider, token, refreshToken, expiresAt }) }),
+    saveCustomProviders: (providers: any[]) =>
+      request('/user/custom-providers', { method: 'PUT', body: JSON.stringify({ providers }) }),
+    saveFallbackProviders: (providers: any[]) =>
+      request('/user/fallback-providers', { method: 'PUT', body: JSON.stringify({ providers }) }),
+    savePooledCredentials: (credentials: any[]) =>
+      request('/user/pooled-credentials', { method: 'PUT', body: JSON.stringify({ credentials }) }),
+    saveSkills: (skills: string[]) =>
+      request('/user/skills', { method: 'PUT', body: JSON.stringify({ skills }) }),
+    getSkillsLibrary: () => request('/skills/'),
+    createSkill: (name: string, description: string, prompt: string) =>
+      request('/skills/', { method: 'POST', body: JSON.stringify({ name, description, prompt }) }),
+    updateSkill: (id: string, data: any) =>
+      request(`/skills/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteSkill: (id: string) =>
+      request(`/skills/${id}`, { method: 'DELETE' }),
+    getMemory: () => request('/user/memory'),
+    saveMemory: (key: string, value: string, category?: string) =>
+      request('/user/memory', { method: 'POST', body: JSON.stringify({ key, value, category }) }),
+    deleteMemory: (id: string) =>
+      request(`/user/memory/${id}`, { method: 'DELETE' }),
+    sessions: () => request('/user/sessions'),
   },
   chat: {
     send: (message: string, sessionId?: string) =>

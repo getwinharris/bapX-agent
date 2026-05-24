@@ -30,6 +30,28 @@
   }
 }
 
+/* Markdown content styles */
+.markdown-content p:last-child { margin-bottom: 0; }
+.markdown-content ul:last-child { margin-bottom: 0; }
+.markdown-content ol:last-child { margin-bottom: 0; }
+
+/* Inline code */
+code:not([class]) {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8125rem;
+}
+
+/* Code block container - prevent content from overflowing */
+.markdown-content pre,
+.markdown-content div[class*="language-"] {
+  margin-bottom: 1rem;
+}
+
+/* Smooth scrollbar for code blocks */
+pre::-webkit-scrollbar { height: 4px; }
+pre::-webkit-scrollbar-track { background: transparent; }
+pre::-webkit-scrollbar-thumb { background: #3a3a4e; border-radius: 2px; }
+
 .typing-indicator span {
   animation: blink 1.4s infinite both;
 }

@@ -5,6 +5,7 @@ import { authRoutes } from './routes/auth.js'
 import { userRoutes } from './routes/user.js'
 import { chatRoutes } from './routes/chat.js'
 import { sandboxRoutes } from './routes/sandbox.js'
+import { projectRoutes, mcpRoutes, automationRoutes, skillRoutes } from './routes/features.js'
 import { requireJwtSecret } from './middleware/auth.js'
 
 const PORT = parseInt(process.env.PORT || '3001', 10)
@@ -38,6 +39,10 @@ await app.register(authRoutes, { prefix: '/api/auth' })
 await app.register(userRoutes, { prefix: '/api/user' })
 await app.register(chatRoutes, { prefix: '/api/chat' })
 await app.register(sandboxRoutes, { prefix: '/api/sandbox' })
+await app.register(projectRoutes, { prefix: '/api/projects' })
+await app.register(mcpRoutes, { prefix: '/api/mcp' })
+await app.register(automationRoutes, { prefix: '/api/automation' })
+await app.register(skillRoutes, { prefix: '/api/skills' })
 
 // Health check
 app.get('/api/health', async () => ({ status: 'ok', time: new Date().toISOString() }))

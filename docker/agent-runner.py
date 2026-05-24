@@ -1,28 +1,152 @@
-"""bapX Agent Runner — runs inside Docker sandbox per user.
+"""bapX Agent — OpenAI Agents SDK inside OpenSandbox sandbox.
 
-Listens on port 8765 for chat messages via SSE.
-Uses user's configured provider/API key directly.
+Listens on port 8765 for SSE chat bridge.
+Uses user's SOUL.md as agent instructions.
+Has web search, browser, code tools + filesystem access.
+Memory persists in /home/user/.memory/
+Skills in /home/user/skills/
 """
-import os
-import json
-import httpx
+
+import os, json, uuid, asyncio
+from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import uuid
+from agents import Agent, Runner, WebSearchTool, ComputerTool, function_tool
+from agents import set_default_openai_key, set_default_openai_base_url
 
 app = FastAPI(title="bapX Agent")
+_INTERNAL_KEY = os.environ.get("BAPX_INTERNAL_API_KEY", "")
+USER_HOME = Path("/home/user")
 
-# Shared internal API key for sandbox-to-backend auth
-_INTERNAL_API_KEY = os.environ.get("BAPX_INTERNAL_API_KEY", "")
-
+# ── Auth ──
 async def verify_auth(request: Request):
-    """Check that the caller provides the correct internal API key."""
-    auth_header = request.headers.get("Authorization", "")
-    expected = f"Bearer {_INTERNAL_API_KEY}"
-    if _INTERNAL_API_KEY and auth_header != expected:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    auth = request.headers.get("Authorization", "")
+    expected = f"Bearer {_INTERNAL_KEY}"
+    if _INTERNAL_KEY and auth != expected:
+        raise HTTPException(401, "Unauthorized")
 
+# ── Function Tools ──
+@function_tool
+def read_file(path: str) -> str:
+    """Read a file from the sandbox filesystem."""
+    full = USER_HOME / path.lstrip('/')
+    if not full.exists() or not str(full).startswith(str(USER_HOME)):
+        return f"Error: File not found or access denied: {path}"
+    try:
+        return full.read_text(encoding='utf-8', errors='replace')
+    except Exception as e:
+        return f"Error reading file: {e}"
+
+@function_tool
+def write_file(path: str, content: str) -> str:
+    """Write content to a file in the sandbox filesystem."""
+    full = USER_HOME / path.lstrip('/')
+    if not str(full).startswith(str(USER_HOME)):
+        return "Error: Access denied"
+    try:
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_text(content, encoding='utf-8')
+        return f"Written to {path}"
+    except Exception as e:
+        return f"Error writing file: {e}"
+
+@function_tool
+def list_files(path: str = "") -> str:
+    """List files in a directory in the sandbox."""
+    base = USER_HOME / path.lstrip('/') if path else USER_HOME
+    if not str(base).startswith(str(USER_HOME)):
+        return "Error: Access denied"
+    if not base.exists():
+        return f"Directory not found: {path or '/'}"
+    try:
+        items = []
+        for f in base.iterdir():
+            size = f.stat().st_size if f.is_file() else 0
+            items.append(f"{'📁' if f.is_dir() else '📄'} {f.name} ({size} bytes)" if f.is_file() else f"{'📁' if f.is_dir() else '📄'} {f.name}")
+        return "\n".join(items) if items else "(empty)"
+    except Exception as e:
+        return f"Error: {e}"
+
+@function_tool
+def run_python(code: str) -> str:
+    """Execute Python code and return the output."""
+    import subprocess, tempfile
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, dir='/tmp') as f:
+            f.write(code)
+            f.flush()
+            result = subprocess.run(['python3', f.name], capture_output=True, text=True, timeout=30, cwd=str(USER_HOME))
+            out = result.stdout
+            if result.stderr:
+                out += f"\n[stderr]\n{result.stderr[:2000]}"
+            os.unlink(f.name)
+            return out or "(no output)"
+    except subprocess.TimeoutExpired:
+        return "Error: Execution timed out (>30s)"
+    except Exception as e:
+        return f"Error: {e}"
+
+# ── Agent Setup ──
+agent_name = os.environ.get("BAPX_AGENT_NAME", "BapX")
+user_name = os.environ.get("BAPX_USER_NAME", "User")
+soul_md = os.environ.get("BAPX_SOUL_MD", "")
+provider = os.environ.get("BAPX_PROVIDER", "openai")
+api_key = os.environ.get("BAPX_API_KEY", "")
+model = os.environ.get("BAPX_MODEL", "gpt-4o")
+
+# NOTE: OpenAI Agents SDK uses OpenAI-compatible API format.
+# Anthropic and Google use non-compatible APIs requiring their own SDKs.
+# For Anthropic access: use OpenRouter with "anthropic/claude-sonnet-4" model.
+if api_key:
+    set_default_openai_key(api_key)
+
+if provider == "openai":
+    set_default_openai_base_url("https://api.openai.com/v1")
+elif provider == "openrouter":
+    set_default_openai_base_url("https://openrouter.ai/api/v1")
+elif provider == "custom":
+    set_default_openai_base_url(os.environ.get("BAPX_CUSTOM_BASE_URL", "https://api.openai.com/v1"))
+elif provider in ("anthropic", "google"):
+    # Anthropic/Google APIs are NOT OpenAI-compatible with openai-agents SDK.
+    # Log a warning and fall back. Users should use OpenRouter for these.
+    import logging
+    logging.warning(f"Provider '{provider}' is not OpenAI-compatible. "
+                    "OpenAI Agents SDK only supports OpenAI-compatible endpoints. "
+                    "Use OpenRouter or a custom proxy for Anthropic/Google models.")
+    set_default_openai_base_url("https://api.openai.com/v1")
+else:
+    set_default_openai_base_url("https://api.openai.com/v1")
+
+instructions = f"""{soul_md}
+
+You are {agent_name}, {user_name}'s personal autonomous AI agent.
+You have access to tools. Be proactive and helpful.
+
+Your workspace is at /home/user/. Create files there.
+Projects go in /home/user/projects/
+Images go in /home/user/images/
+Websites go in /home/user/websites/
+Documents go in /home/user/documents/
+Presentations go in /home/user/presentations/
+Downloads go in /home/user/downloads/
+"""
+
+agent = Agent(
+    name=agent_name,
+    instructions=instructions,
+    model=model if model else "gpt-4o",
+    tools=[
+        WebSearchTool(),
+        ComputerTool(),
+        read_file,
+        write_file,
+        list_files,
+        run_python,
+    ]
+)
+
+# ── Chat Request ──
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
@@ -31,124 +155,42 @@ class ChatRequest(BaseModel):
 @app.get("/health")
 async def health(request: Request):
     await verify_auth(request)
-    return {"status": "ok", "service": "bapx-agent"}
+    return {"status": "ok", "service": "bapx-agent", "agent": agent_name}
 
 @app.post("/chat")
 async def chat(req: ChatRequest, request: Request):
-    """Stream a chat completion to the user through the API bridge."""
     await verify_auth(request)
-
-    api_key = os.environ.get("BAPX_API_KEY", "")
-    provider = os.environ.get("BAPX_PROVIDER", "openai")
-    model = os.environ.get("BAPX_MODEL", "gpt-4o")
-    soul_md = os.environ.get("BAPX_SOUL_MD", "")
-    agent_name = os.environ.get("BAPX_AGENT_NAME", "BapX")
-    user_name = os.environ.get("BAPX_USER_NAME", "User")
-
-    # Build system prompt from SOUL.md
-    system_prompt = soul_md if soul_md else f"You are {agent_name}, {user_name}'s personal autonomous AI agent."
-
-    messages = [{"role": "system", "content": system_prompt}]
-    if req.history:
-        messages.extend(req.history)
-    messages.append({"role": "user", "content": req.message})
 
     async def stream():
         try:
-            # Determine API endpoint based on provider
-            if provider == "anthropic":
-                base_url = "https://api.anthropic.com/v1/messages"
-                headers = {
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                }
-                body = {
-                    "model": model,
-                    "messages": [m for m in messages if m["role"] != "system"],
-                    "system": system_prompt,
-                    "max_tokens": 4096,
-                    "stream": True,
-                }
-            elif provider == "google":
-                base_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent"
-                headers = {"x-goog-api-key": api_key, "content-type": "application/json"}
-                # Google uses its own conversation format — send full history
-                contents = []
-                for m in messages:
-                    if m["role"] == "system":
-                        # Google Gemini doesn't have a system role — prefix it
-                        contents.append({
-                            "role": "user",
-                            "parts": [{"text": f"[System Instructions]: {m['content']}"}]
-                        })
-                    elif m["role"] in ("user", "assistant"):
-                        contents.append({
-                            "role": "model" if m["role"] == "assistant" else "user",
-                            "parts": [{"text": m["content"]}]
-                        })
-                body = {"contents": contents}
-            else:
-                # OpenAI / OpenRouter / Custom
-                if provider == "openrouter":
-                    base_url = "https://openrouter.ai/api/v1/chat/completions"
-                elif provider == "custom":
-                    base_url = os.environ.get("BAPX_CUSTOM_BASE_URL", "https://api.openai.com/v1/chat/completions")
-                else:
-                    base_url = "https://api.openai.com/v1/chat/completions"
+            # Build messages from history + new message
+            messages = []
+            if req.history:
+                messages.extend(req.history)
+            messages.append({"role": "user", "content": req.message})
 
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "content-type": "application/json",
-                }
-                body = {"model": model, "messages": messages, "stream": True, "max_tokens": 4096}
+            # Run agent with streaming
+            result = Runner.run_streamed(agent, messages)
+            full_content = ""
 
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                async with client.stream("POST", base_url, json=body, headers=headers) as resp:
-                    if resp.status_code != 200:
-                        # Truncate and sanitize error — never expose raw API details
-                        yield f"data: {json.dumps({'error': f'Upstream API error (HTTP {resp.status_code})'})}\n\n"
-                        return
-
-                    full_content = ""
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: "):
-                            data = line[6:].strip()
-                            if data == "[DONE]":
-                                break
-                            try:
-                                parsed = json.loads(data)
-                                if provider == "anthropic":
-                                    if parsed.get("type") == "content_block_delta":
-                                        text = parsed.get("delta", {}).get("text", "")
-                                        if text:
-                                            full_content += text
-                                            yield f"data: {json.dumps({'text': text})}\n\n"
-                                else:
-                                    delta = parsed.get("choices", [{}])[0].get("delta", {})
-                                    if delta.get("content"):
-                                        full_content += delta["content"]
-                                        yield f"data: {json.dumps({'text': delta['content']})}\n\n"
-                                    if delta.get("tool_calls"):
-                                        for tc in delta["tool_calls"]:
-                                            yield f"data: {json.dumps({'tool_call': tc})}\n\n"
-                            except json.JSONDecodeError:
-                                pass
+            async for event in result.stream_events():
+                if event.type == "raw_response_event":
+                    if hasattr(event.data, 'delta') and event.data.delta:
+                        full_content += event.data.delta
+                        yield f"data: {json.dumps({'text': event.data.delta})}\n\n"
+                elif event.type == "run_item_stream_event":
+                    if event.item and hasattr(event.item, 'type'):
+                        if event.item.type == "tool_call":
+                            tc_data = json.dumps({"tool_call": {"name": event.item.name, "args": str(event.item.args)[:200]}})
+                            yield f"data: {tc_data}\n\n"
 
             yield f"data: {json.dumps({'done': True, 'sessionId': req.session_id or str(uuid.uuid4())})}\n\n"
 
-        except Exception:
-            # Never leak internal details to the client
+        except Exception as e:
+            # Sanitize error — never expose raw exception details to client
             yield f"data: {json.dumps({'error': 'An internal error occurred while processing your request'})}\n\n"
 
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        }
-    )
+    return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
 
 if __name__ == "__main__":
     import uvicorn

@@ -35,7 +35,8 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     const token = auth.slice(7)
     const payload = jwt.verify(token, requireJwtSecret()) as { userId: string }
     request.userId = payload.userId
-  } catch {
+  } catch (err) {
+    request.log.warn({ err }, 'JWT verification failed')
     return reply.status(401).send({ error: 'Invalid or expired token' })
   }
 }
