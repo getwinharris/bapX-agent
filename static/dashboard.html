@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>bapX Agent Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #0f0f13; color: #e0e0e0; }
+    h1 { font-size: 2rem; background: linear-gradient(135deg, #6c5ce7, #a29bfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .card { background: #1a1a24; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
+    .status { color: #00e676; }
+    .status::before { content: "●"; margin-right: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>bapX Agent Dashboard</h1>
+  <div class="card">
+    <h2>System Status</h2>
+    <p class="status">All services operational</p>
+    <p>API Backend: Online</p>
+    <p>Database: Connected</p>
+  </div>
+  <div class="card">
+    <h2>API Endpoints</h2>
+    <p><a href="/api/health">/api/health</a></p>
+  </div>
+</body>
+</html>
