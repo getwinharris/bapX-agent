@@ -15,7 +15,11 @@ from agents import Agent, Runner, RunConfig, function_tool, WebSearchTool
 from agents.models.multi_provider import MultiProvider
 from openai import AsyncOpenAI
 
-# ── Tools ──
+# Codex binary paths — separate CTO (my dev) from platform (user sessions)
+CODEX_CTO_BIN = os.path.expanduser("~/.hermes/node/bin/codex")
+CODEX_PLATFORM_BIN = "/usr/local/bin/bapXcodex"
+
+# --- Tools ---
 
 @function_tool
 def codex_execute(prompt: str) -> str:
@@ -23,9 +27,11 @@ def codex_execute(prompt: str) -> str:
     Use this for complex coding, code review, debugging, or file operations.
     The prompt should be a self-contained instruction for Codex.
     """
-    codex_bin = os.path.expanduser("~/.hermes/node/bin/codex")
+    codex_bin = CODEX_CTO_BIN
     if not os.path.exists(codex_bin):
-        return "Codex CLI not found at ~/.hermes/node/bin/codex"
+        codex_bin = CODEX_PLATFORM_BIN
+    if not os.path.exists(codex_bin):
+        return "Codex CLI not found"
     try:
         result = subprocess.run(
             [codex_bin, "exec", prompt],
@@ -135,7 +141,7 @@ def sandbox_Codex_run(message: str, sandbox_id: str = "") -> str:
         try:
             resp = httpx.post(
                 f"http://127.0.0.1:8080/v1/sandboxes/{sandbox_id}/exec",
-                json={"command": f"codex exec '{message}'"},
+                json={"command": f"bapXcodex exec '{message}'"},
                 timeout=60,
             )
             if resp.status_code < 500:
