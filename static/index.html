@@ -3,21 +3,411 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>bapX</title>
+  <title>bapX — Autonomous AI Agent Platform</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f0f13; color: #e0e0e0; }
-    .container { text-align: center; }
-    h1 { font-size: 3rem; font-weight: 700; background: linear-gradient(135deg, #6c5ce7, #a29bfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    p { color: #888; }
-    .status { margin-top: 2rem; color: #00e676; }
-    .status::before { content: "●"; margin-right: 0.5rem; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0f0f13;--bg2:#14141c;--bg3:#1a1a24;--fg:#e8e8f0;--muted:#6b7280;--accent:#9651b8;--accent-hover:#7a3f9e;--accent-light:rgba(150,81,184,0.12);--border:rgba(255,255,255,0.06);--radius:8px;--radius-lg:12px;--radius-xl:16px;--shadow:0 2px 12px rgba(0,0,0,0.3)}
+    html{scroll-behavior:smooth}
+    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.6}
+    a{color:var(--accent);text-decoration:none;transition:color .2s}
+    a:hover{color:#c084fc}
+    img{max-width:100%;height:auto}
+
+    /* ── Nav ── */
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;background:rgba(15,15,19,0.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:56px}
+    .nav-logo{font-size:1.375rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,#b35fd9,#7a3f9e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .nav-links{display:flex;align-items:center;gap:1.5rem}
+    .nav-links a{font-size:.875rem;font-weight:500;color:#9ca3af;transition:color .2s}
+    .nav-links a:hover{color:var(--fg)}
+    .nav-cta{padding:.5rem 1.25rem;background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff!important;border-radius:var(--radius);font-weight:600;font-size:.8125rem;transition:all .2s}
+    .nav-cta:hover{box-shadow:0 4px 16px rgba(150,81,184,0.3);transform:translateY(-1px)}
+    .mobile-menu-btn{display:none;background:none;border:none;color:var(--fg);cursor:pointer;padding:4px}
+    .mobile-menu{display:none}
+    @media(max-width:768px){
+      .nav-links{display:none}
+      .mobile-menu-btn{display:block}
+      .mobile-menu{position:fixed;top:56px;left:0;right:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem;display:none;flex-direction:column;gap:.75rem;z-index:99}
+      .mobile-menu.open{display:flex}
+      .mobile-menu a{font-size:.9375rem;padding:.5rem 0;color:#9ca3af}
+      .mobile-menu .nav-cta{text-align:center;padding:.75rem}
+    }
+
+    /* ── Sections ── */
+    section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto}
+    .section-label{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+    .section-title{font-size:2.25rem;font-weight:800;letter-spacing:-0.03em;line-height:1.2;margin-bottom:1rem}
+    .section-subtitle{font-size:1.125rem;color:var(--muted);max-width:600px;line-height:1.6}
+    .center{text-align:center}
+    .center .section-subtitle{margin:0 auto 2rem}
+
+    /* ── Hero ── */
+    .hero{padding-top:7rem;padding-bottom:4rem;text-align:center;position:relative;overflow:hidden}
+    .hero::before{content:'';position:absolute;top:-30%;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(150,81,184,0.08) 0%,transparent 70%);pointer-events:none}
+    .hero-badge{display:inline-flex;align-items:center;gap:6px;padding:.375rem 1rem;border-radius:20px;background:var(--accent-light);border:1px solid rgba(150,81,184,0.2);font-size:.8125rem;font-weight:500;color:var(--accent);margin-bottom:2rem}
+    .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .hero h1{font-size:3.5rem;font-weight:800;letter-spacing:-0.04em;line-height:1.1;margin-bottom:1.5rem}
+    .hero h1 .gradient{background:linear-gradient(135deg,#b35fd9,#7a3f9e,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero p{font-size:1.25rem;color:var(--muted);max-width:650px;margin:0 auto 2.5rem;line-height:1.7}
+    .hero-cta{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:.8125rem 2rem;border-radius:var(--radius);font-size:.9375rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;border:none;line-height:1}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff}
+    .btn-primary:hover{box-shadow:0 6px 24px rgba(150,81,184,0.35);transform:translateY(-2px)}
+    .btn-secondary{background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--fg)}
+    .btn-secondary:hover{background:rgba(255,255,255,0.08);border-color:rgba(150,81,184,0.3);transform:translateY(-2px)}
+    .btn-lg{padding:1rem 2.5rem;font-size:1.0625rem}
+    .hero-stats{display:flex;justify-content:center;gap:3rem;margin-top:3rem;padding-top:2.5rem;border-top:1px solid var(--border)}
+    .stat{text-align:center}
+    .stat-num{font-size:1.75rem;font-weight:800;color:var(--fg)}
+    .stat-label{font-size:.8125rem;color:var(--muted);margin-top:.25rem}
+    @media(max-width:768px){
+      .hero h1{font-size:2.25rem}
+      .hero p{font-size:1rem}
+      .hero-stats{gap:1.5rem;flex-wrap:wrap}
+      .stat-num{font-size:1.375rem}
+    }
+
+    /* ── How It Works ── */
+    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:2rem}
+    .step{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;position:relative;transition:all .3s}
+    .step:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.2)}
+    .step-num{position:absolute;top:1rem;right:1rem;font-size:2.5rem;font-weight:800;color:rgba(150,81,184,0.12);line-height:1}
+    .step-icon{width:44px;height:44px;border-radius:12px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;color:var(--accent)}
+    .step h3{font-size:1.125rem;font-weight:700;margin-bottom:.5rem}
+    .step p{font-size:.875rem;color:var(--muted);line-height:1.6}
+    @media(max-width:768px){.steps{grid-template-columns:1fr}}
+
+    /* ── Cards Grid ── */
+    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:2rem}
+    .card{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;transition:all .3s}
+    .card:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.2)}
+    .card-icon{width:40px;height:40px;border-radius:10px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;margin-bottom:1rem;color:var(--accent);font-size:1.125rem}
+    .card h3{font-size:1rem;font-weight:700;margin-bottom:.375rem}
+    .card p{font-size:.8125rem;color:var(--muted);line-height:1.6}
+
+    /* ── Providers ── */
+    .provider-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem;margin-top:2rem}
+    .provider-item{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center;font-size:.8125rem;font-weight:500;color:var(--muted);transition:all .2s}
+    .provider-item:hover{border-color:rgba(150,81,184,0.25);color:var(--fg)}
+
+    /* ── Skills Showcase ── */
+    .skill-tags{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;margin-top:2rem;max-width:800px;margin-left:auto;margin-right:auto}
+    .skill-tag{padding:.375rem .875rem;border-radius:20px;background:var(--accent-light);border:1px solid rgba(150,81,184,0.12);font-size:.8125rem;font-weight:500;color:var(--accent);transition:all .2s}
+    .skill-tag:hover{background:rgba(150,81,184,0.2);transform:translateY(-1px)}
+    .skill-categories{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;margin-top:2rem;text-align:left}
+    .skill-cat{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;transition:all .2s}
+    .skill-cat:hover{border-color:rgba(150,81,184,0.2)}
+    .skill-cat h4{font-size:.875rem;font-weight:600;margin-bottom:.25rem}
+    .skill-cat p{font-size:.75rem;color:var(--muted)}
+
+    /* ── CTA ── */
+    .cta-section{text-align:center;padding:6rem 1.5rem;position:relative}
+    .cta-section::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(150,81,184,0.06) 0%,transparent 70%);pointer-events:none}
+    .cta-card{background:linear-gradient(135deg,rgba(150,81,184,0.06),rgba(99,102,241,0.04));border:1px solid rgba(150,81,184,0.15);border-radius:var(--radius-xl);padding:3.5rem 2rem;max-width:700px;margin:0 auto;position:relative}
+    .cta-card h2{font-size:2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:.75rem}
+    .cta-card p{color:var(--muted);margin-bottom:2rem;font-size:1rem}
+    .cta-footer-text{margin-top:1rem;font-size:.8125rem;color:var(--muted)}
+
+    /* ── Footer ── */
+    footer{padding:2rem 1.5rem 3rem;border-top:1px solid var(--border);text-align:center}
+    footer p{font-size:.8125rem;color:var(--muted)}
+    footer .footer-links{display:flex;justify-content:center;gap:2rem;margin-bottom:1rem;flex-wrap:wrap}
+    footer .footer-links a{font-size:.8125rem;color:var(--muted)}
+    footer .footer-links a:hover{color:var(--fg)}
+
+    /* ── Dividers ── */
+    .divider{height:1px;background:var(--border);margin:0 auto;max-width:1100px}
+
+    @media(max-width:768px){
+      section{padding:3rem 1rem}
+      .section-title{font-size:1.75rem}
+      .cards{grid-template-columns:1fr}
+      .provider-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+      .skill-categories{grid-template-columns:1fr 1fr}
+      .cta-card{padding:2.5rem 1.5rem}
+      .cta-card h2{font-size:1.5rem}
+    }
+    @media(max-width:480px){
+      .skill-categories{grid-template-columns:1fr}
+      .hero-cta{flex-direction:column;align-items:stretch}
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>bapX</h1>
-    <p>Autonomous AI Agent Platform</p>
-    <div class="status">All systems operational</div>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-logo">bapX</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#providers">Providers</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/dashboard.html#login">Sign In</a>
+    <a href="/dashboard.html#signup" class="nav-cta">Get Started</a>
   </div>
+  <button class="mobile-menu-btn" onclick="toggleMobile()" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+</nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="#features" onclick="toggleMobile()">Features</a>
+  <a href="#how-it-works" onclick="toggleMobile()">How It Works</a>
+  <a href="#providers" onclick="toggleMobile()">Providers</a>
+  <a href="#pricing" onclick="toggleMobile()">Pricing</a>
+  <a href="/dashboard.html#login" onclick="toggleMobile()">Sign In</a>
+  <a href="/dashboard.html#signup" class="nav-cta" onclick="toggleMobile()">Get Started</a>
+</div>
+
+<!-- Hero -->
+<section class="hero" id="hero">
+  <div class="hero-badge"><span class="dot"></span> Now in beta — all providers supported</div>
+  <h1>Your own AI agent,<br><span class="gradient">powered by any model.</span></h1>
+  <p>bapX is an autonomous AI agent platform that works with <strong>your</strong> AI provider — OpenAI, Anthropic, Google, DeepSeek, or any of 26+ API providers. Bring your own key, get a fully managed AI agent with sandboxed execution, 100+ skills, and zero compute fees.</p>
+  <div class="hero-cta">
+    <a href="/dashboard.html#signup" class="btn btn-primary btn-lg">Start Free</a>
+    <a href="#how-it-works" class="btn btn-secondary btn-lg">How It Works</a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num">26+</div><div class="stat-label">AI Providers</div></div>
+    <div class="stat"><div class="stat-num">100+</div><div class="stat-label">Built-in Skills</div></div>
+    <div class="stat"><div class="stat-num">3</div><div class="stat-label">Auth Methods</div></div>
+    <div class="stat"><div class="stat-num">Free</div><div class="stat-label">Compute</div></div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- How It Works -->
+<section id="how-it-works" class="center">
+  <div class="section-label">How It Works</div>
+  <h2 class="section-title">One platform, your choice of AI</h2>
+  <p class="section-subtitle">Bring your own API key or connect via OAuth. bapX handles everything else.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <h3>Create Your Account</h3>
+      <p>Sign up in seconds with just an email and password. No credit card required — you use your own AI provider.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <h3>Connect Your Provider</h3>
+      <p>Add your API key or connect via OAuth from any of 26+ supported providers. Switch between them anytime.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <h3>Get Things Done</h3>
+      <p>Your agent works autonomously — code, research, create, browse, and execute. 100+ skills ready to go.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Features -->
+<section id="features" class="center">
+  <div class="section-label">Features</div>
+  <h2 class="section-title">Everything you need in one place</h2>
+  <p class="section-subtitle">Not just a chat interface — a full autonomous agent workspace.</p>
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <h3>Multi-Model Chat</h3>
+      <p>Seamlessly switch between any AI provider. One interface for GPT-4o, Claude, Gemini, Grok, DeepSeek, and more.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <h3>100+ Built-in Skills</h3>
+      <p>From web research and coding to design and data science. All skills from the proven Hermes library, ready to toggle on/off.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <h3>Sandboxed Execution</h3>
+      <p>Your agent runs code in isolated Docker containers. Safe, secure, and automatically cleaned up when you're done.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <h3>OAuth Login</h3>
+      <p>Connect ChatGPT Plus, Claude Max, Grok, and more via device-code OAuth. No API key needed for supported providers.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <h3>Memory &amp; Context</h3>
+      <p>Persistent memory across sessions. Your agent remembers preferences, learns from corrections, and gets smarter over time.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      </div>
+      <h3>Canvas &amp; Preview</h3>
+      <p>Visual workspace for diagrams, websites, and presentations. Built-in browser preview and live editing.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Providers -->
+<section id="providers" class="center">
+  <div class="section-label">Providers</div>
+  <h2 class="section-title">26+ AI providers, one platform</h2>
+  <p class="section-subtitle">API key or OAuth — whichever you prefer. Bring your own key and keep full control.</p>
+  <div class="provider-grid">
+    <div class="provider-item">OpenAI</div>
+    <div class="provider-item">Anthropic</div>
+    <div class="provider-item">Google Gemini</div>
+    <div class="provider-item">DeepSeek</div>
+    <div class="provider-item">OpenRouter</div>
+    <div class="provider-item">xAI Grok</div>
+    <div class="provider-item">Groq</div>
+    <div class="provider-item">Mistral</div>
+    <div class="provider-item">Together AI</div>
+    <div class="provider-item">Cohere</div>
+    <div class="provider-item">Perplexity</div>
+    <div class="provider-item">Hugging Face</div>
+    <div class="provider-item">MiniMax</div>
+    <div class="provider-item">Kimi Moonshot</div>
+    <div class="provider-item">Xiaomi MiMo</div>
+    <div class="provider-item">Z.AI GLM</div>
+    <div class="provider-item">Alibaba DashScope</div>
+    <div class="provider-item">StepFun</div>
+    <div class="provider-item">GitHub Copilot</div>
+    <div class="provider-item">Qwen Portal</div>
+    <div class="provider-item">ChatGPT (OAuth)</div>
+    <div class="provider-item">Nous Portal</div>
+  </div>
+  <p style="margin-top:1.5rem;font-size:.875rem;color:var(--muted)">...and more. API key + OAuth + Copilot auth methods supported.</p>
+</section>
+
+<div class="divider"></div>
+
+<!-- Skills -->
+<section class="center">
+  <div class="section-label">Skills</div>
+  <h2 class="section-title">100+ skills at your agent's fingertips</h2>
+  <p class="section-subtitle">Every skill from the proven Hermes library, available out of the box. Toggle them on/off as needed.</p>
+  <div class="skill-categories">
+    <div class="skill-cat"><h4>🤖 Autonomous Agents</h4><p>Codex, Claude Code, Hermes, OpenCode agents</p></div>
+    <div class="skill-cat"><h4>🎨 Creative</h4><p>ASCII art, design, infographics, pixel art, sketches</p></div>
+    <div class="skill-cat"><h4>📝 Content</h4><p>Blog writing, YouTube summaries, presentations</p></div>
+    <div class="skill-cat"><h4>💻 Development</h4><p>TDD, code review, debugging, project planning</p></div>
+    <div class="skill-cat"><h4>📊 Data Science</h4><p>Jupyter notebooks, evaluation, DSPy, W&B</p></div>
+    <div class="skill-cat"><h4>🔐 Security</h4><p>Red teaming, code audit, vulnerability scanning</p></div>
+    <div class="skill-cat"><h4>🌐 Web</h4><p>Browser automation, web scraping, API testing</p></div>
+    <div class="skill-cat"><h4>📱 Social</h4><p>X/Twitter, email, GIF search, Spotify, YouTube</p></div>
+    <div class="skill-cat"><h4>⚙️ DevOps</h4><p>GitHub workflows, Kanban, cron jobs, deployment</p></div>
+    <div class="skill-cat"><h4>🧠 Research</h4><p>ArXiv, blog monitoring, knowledge graphs, PMC</p></div>
+  </div>
+  <div class="skill-tags">
+    <span class="skill-tag">code-review</span>
+    <span class="skill-tag">design-md</span>
+    <span class="skill-tag">excalidraw</span>
+    <span class="skill-tag">manim-video</span>
+    <span class="skill-tag">p5js</span>
+    <span class="skill-tag">pixel-art</span>
+    <span class="skill-tag">spotify</span>
+    <span class="skill-tag">arxiv</span>
+    <span class="skill-tag">llama-cpp</span>
+    <span class="skill-tag">dspy</span>
+    <span class="skill-tag">notion</span>
+    <span class="skill-tag">obsidian</span>
+    <span class="skill-tag">airtable</span>
+    <span class="skill-tag">linear</span>
+    <span class="skill-tag">godmode</span>
+    <span class="skill-tag">minecraft</span>
+    <span class="skill-tag">pokemon</span>
+    <span class="skill-tag">opensandbox</span>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Pricing -->
+<section id="pricing" class="center">
+  <div class="section-label">Pricing</div>
+  <h2 class="section-title">You only pay for storage</h2>
+  <p class="section-subtitle">AI compute, sandbox execution, and all platform features are free. We charge based on the storage you use — no feature tiers, no artificial limits.</p>
+  <div style="max-width:500px;margin:2rem auto 0">
+    <div style="background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-xl);padding:2.5rem;text-align:center">
+      <div style="font-size:.875rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem">Coming Soon</div>
+      <h3 style="font-size:1.5rem;font-weight:700;margin-bottom:1rem">Storage-Based Pricing</h3>
+      <ul style="list-style:none;text-align:left;display:inline-block;font-size:.875rem;color:var(--muted);line-height:2">
+        <li>✓ Free AI compute — no per-token charges</li>
+        <li>✓ Free sandbox execution time</li>
+        <li>✓ Pay only for what you store</li>
+        <li>✓ No feature tiers — all features for everyone</li>
+        <li>✓ Abuse monitoring, not artificial limits</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-card">
+    <h2>Ready to build with your AI?</h2>
+    <p>Connect your provider and start using your AI agent in minutes. No credit card, no commitment.</p>
+    <a href="/dashboard.html#signup" class="btn btn-primary btn-lg">Create Your Agent</a>
+    <div class="cta-footer-text">Free to start. Only pay for storage used.</div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-links">
+    <a href="#hero">Home</a>
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#providers">Providers</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/dashboard.html#login">Sign In</a>
+  </div>
+  <p>&copy; 2026 bapX. All rights reserved.</p>
+</footer>
+
+<script>
+function toggleMobile(){
+  var menu = document.getElementById('mobile-menu');
+  menu.classList.toggle('open');
+}
+// Close mobile menu on nav link click
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.mobile-menu') && !e.target.closest('.mobile-menu-btn')){
+    document.getElementById('mobile-menu').classList.remove('open');
+  }
+});
+// Smooth scroll for hash links
+document.querySelectorAll('a[href^="#"]').forEach(function(a){
+  a.addEventListener('click', function(e){
+    var target = document.querySelector(this.getAttribute('href'));
+    if(target){
+      e.preventDefault();
+      target.scrollIntoView({behavior:'smooth'});
+    }
+  });
+});
+</script>
 </body>
 </html>
