@@ -291,40 +291,62 @@ function updateConnectionStatus() {
 }
 
 // ── OAuth ──
+let OAUTH_POPUP = null;
+
 async function startOAuth(provider) {
-  showOAuthModal(provider, 'Starting...', '', '');
-  try {
-    const r = await api('/api/auth/oauth/start', { method:'POST', body:JSON.stringify({provider}) });
-    const d = await r.json();
-    showOAuthModal(provider, d.user_code, d.verification_uri, d.flow_id);
-    OAUTH_POLLING = setInterval(() => pollOAuth(d.flow_id), 3000);
-  } catch(e) { alert(e.message); closeOAuthModal(); }
-}
-
-async function pollOAuth(flowId) {
-  try {
-    const r = await api('/api/auth/oauth/poll', { method:'POST', body:JSON.stringify({flow_id:flowId}) });
-    const d = await r.json();
-    document.getElementById('oauth-status').textContent = d.status === 'completed' ? '✓ Connected!' : d.status === 'expired' ? '✗ Expired' : 'Waiting for authorization...';
-    if (d.status === 'completed') { clearInterval(OAUTH_POLLING); OAUTH_POLLING=null; setTimeout(closeOAuthModal,1500); await loadProfile(); await loadOAuthProviders(); }
-    if (d.status === 'expired' || d.status === 'denied') { clearInterval(OAUTH_POLLING); OAUTH_POLLING=null; }
-  } catch(e) { console.error(e); }
-}
-
-function showOAuthModal(provider, code, url, flowId) {
+  // Show code in modal with auto-open popup
   const modal = document.getElementById('oauth-modal');
   modal.classList.remove('hidden');
   document.getElementById('oauth-modal-title').textContent = `Connect ${provider}`;
-  document.getElementById('oauth-modal-desc').textContent = 'Visit the URL below and enter the code';
-  document.getElementById('oauth-user-code').textContent = code;
-  document.getElementById('oauth-verify-url').textContent = url || '...';
-  document.getElementById('oauth-spinner').style.display = flowId ? 'block' : 'none';
-  document.getElementById('oauth-status').textContent = flowId ? 'Waiting for authorization...' : 'Starting...';
+  document.getElementById('oauth-modal-desc').textContent = 'Authorizing...';
+  document.getElementById('oauth-user-code').textContent = '...';
+  document.getElementById('oauth-verify-url').textContent = 'Starting...';
+  document.getElementById('oauth-spinner').style.display = 'block';
+  document.getElementById('oauth-status').textContent = 'Starting OAuth...';
+  try {
+    const r = await api('/api/auth/oauth/start', { method:'POST', body:JSON.stringify({provider}) });
+    const d = await r.json();
+    // Show code and URL
+    document.getElementById('oauth-modal-title').textContent = `Connect ${d.provider_name}`;
+    document.getElementById('oauth-modal-desc').textContent = 'Enter this code in the popup window';
+    document.getElementById('oauth-user-code').textContent = d.user_code;
+    document.getElementById('oauth-verify-url').textContent = d.verification_uri;
+    document.getElementById('oauth-status').textContent = 'Waiting for authorization in popup...';
+    // Open popup on USER'S browser
+    OAUTH_POPUP = window.open(d.verification_uri, 'bapx-oauth', 'width=600,height=700,menubar=no,toolbar=no');
+    // Poll the backend for token exchange
+    const pollInterval = setInterval(async () => {
+      try {
+        const r2 = await api('/api/auth/oauth/token-exchange', { method:'POST', body:JSON.stringify({flow_id:d.flow_id}) });
+        const s = await r2.json();
+        if (s.status === 'completed') {
+          clearInterval(pollInterval);
+          document.getElementById('oauth-status').textContent = '✓ Connected!';
+          document.getElementById('oauth-spinner').style.display = 'none';
+          if (OAUTH_POPUP && !OAUTH_POPUP.closed) OAUTH_POPUP.close();
+          setTimeout(closeOAuthModal, 1500);
+          await loadProfile();
+          await loadOAuthProviders();
+        } else if (s.status === 'failed') {
+          clearInterval(pollInterval);
+          document.getElementById('oauth-status').textContent = `✗ ${s.error || 'Failed'}`;
+          document.getElementById('oauth-spinner').style.display = 'none';
+          setTimeout(closeOAuthModal, 3000);
+        }
+      } catch(e) { console.error(e); }
+    }, 3000);
+    // Store interval for cleanup
+    OAUTH_POLLING = pollInterval;
+  } catch(e) {
+    document.getElementById('oauth-status').textContent = `Error: ${e.message}`;
+    document.getElementById('oauth-spinner').style.display = 'none';
+  }
 }
 
 function closeOAuthModal() {
   document.getElementById('oauth-modal').classList.add('hidden');
   if (OAUTH_POLLING) { clearInterval(OAUTH_POLLING); OAUTH_POLLING=null; }
+  if (OAUTH_POPUP && !OAUTH_POPUP.closed) OAUTH_POPUP.close();
 }
 
 // ── Skills ──

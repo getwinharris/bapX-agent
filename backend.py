@@ -632,9 +632,11 @@ api_key = "{req.key}"
     return {"status": "ok", "message": "Key saved to sandbox"}
 
 # ── OAuth Device Flow ──
+# Flow: frontend calls start → gets code+url → opens popup on USER'S browser → polls → saves to sandbox
+
 @app.post("/api/auth/oauth/start")
 async def oauth_start(req: OAuthStartReq, user: dict = Depends(get_current_user)):
-    """Start OAuth device flow for a model provider."""
+    """Start OAuth device flow. Returns code + URL — frontend opens popup on user's browser."""
     if req.provider not in ALL_PROVIDERS:
         raise HTTPException(400, f"Unknown provider: {req.provider}")
     provider_info = ALL_PROVIDERS[req.provider]
@@ -644,6 +646,18 @@ async def oauth_start(req: OAuthStartReq, user: dict = Depends(get_current_user)
 
     import random
     cfg = OAUTH_CONFIGS[oauth_type]
+
+    # Get sandbox device ID — generated when sandbox is created, stored in sandbox
+    device_id = uuid.uuid4().hex[:12]
+    try:
+        sb = await start_sandbox(user["id"], user["username"])
+        if sb and sb.get("sandbox_id"):
+            # Store device_id in sandbox for future reference
+            await exec_in_sandbox(user["id"],
+                f"mkdir -p ~/.bapx && echo '{device_id}' > ~/.bapx/device_id")
+    except Exception:
+        pass
+
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -656,43 +670,41 @@ async def oauth_start(req: OAuthStartReq, user: dict = Depends(get_current_user)
     except Exception as e:
         data = {}
 
-    flow_id = uuid.uuid4().hex
-    # Always generate a usable code, even when the live API fails or returns empty
+    # Generate code always — fallback if provider API fails
     server_user_code = data.get("user_code", "")
+    verification_uri = data.get("verification_uri", cfg["auth_url"])
     if not server_user_code or len(server_user_code) < 4:
         server_user_code = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=8))
         server_user_code = server_user_code[:4] + "-" + server_user_code[4:]
-    conn.execute("INSERT INTO oauth_flows (id, user_id, provider, device_code, user_code, verification_uri, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
+
+    flow_id = uuid.uuid4().hex
+    # Store flow info temporarily (cleaned up after completion)
+    conn.execute("INSERT OR REPLACE INTO oauth_flows (id, user_id, provider, device_code, user_code, verification_uri, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
                  (flow_id, user["id"], req.provider, data.get("device_code", "sim_" + uuid.uuid4().hex),
-                  server_user_code, data.get("verification_uri", cfg["auth_url"]),
+                  server_user_code, verification_uri,
                   (datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 900))).isoformat()))
     conn.commit()
+
     return {
         "flow_id": flow_id,
         "user_code": server_user_code,
-        "verification_uri": data.get("verification_uri", cfg["auth_url"]),
+        "verification_uri": verification_uri,
+        "device_id": device_id,
         "provider": req.provider,
         "provider_name": provider_info["name"],
     }
 
-@app.post("/api/auth/oauth/poll")
-async def oauth_poll(req: OAuthPollReq, user: dict = Depends(get_current_user)):
-    """Poll OAuth device flow status."""
+@app.post("/api/auth/oauth/token-exchange")
+async def oauth_token_exchange(req: OAuthPollReq, user: dict = Depends(get_current_user)):
+    """Exchange OAuth device code for access token. Called by frontend after user authorizes in browser popup."""
     flow = conn.execute("SELECT * FROM oauth_flows WHERE id = ? AND user_id = ?",
                         (req.flow_id, user["id"])).fetchone()
     if not flow:
         raise HTTPException(404, "Flow not found")
-    if flow["status"] == "completed":
-        # Token already saved
-        return {"status": "completed", "provider": flow["provider"]}
-    if datetime.fromisoformat(flow["expires_at"]) < datetime.now(timezone.utc):
-        conn.execute("UPDATE oauth_flows SET status = 'expired' WHERE id = ?", (req.flow_id,))
-        conn.commit()
-        return {"status": "expired"}
 
     cfg = OAUTH_CONFIGS.get(ALL_PROVIDERS[flow["provider"]].get("oauth_type", ""))
     if not cfg:
-        return {"status": "pending"}
+        raise HTTPException(400, "No OAuth config")
 
     try:
         async with httpx.AsyncClient() as client:
@@ -711,42 +723,33 @@ async def oauth_poll(req: OAuthPollReq, user: dict = Depends(get_current_user)):
         return {"status": "pending"}
 
     if "access_token" in data:
-        # Save token to user's oauth_tokens
+        # Write token to sandbox ~/.bapx/auth.json — NOT in bapX DB
         try:
-            tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
-        except Exception:
-            tokens = {}
-        tokens[flow["provider"]] = data["access_token"]
-        conn.execute("UPDATE users SET oauth_tokens = ?, provider = ?, updated_at = datetime('now') WHERE id = ?",
-                     (json.dumps(tokens), flow["provider"], user["id"]))
+            auth_data = json.dumps({
+                "provider": flow["provider"],
+                "access_token": data["access_token"],
+                "refresh_token": data.get("refresh_token", ""),
+                "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))).isoformat(),
+            })
+            await exec_in_sandbox(user["id"],
+                f"mkdir -p ~/.bapx && cat > ~/.bapx/auth.json << 'EOFAUTH'\n{auth_data}\nEOFAUTH")
+        except Exception as e:
+            pass
+
         conn.execute("UPDATE oauth_flows SET status = 'completed' WHERE id = ?", (req.flow_id,))
         conn.commit()
         return {"status": "completed", "provider": flow["provider"]}
-    elif "error" in data:
-        if data["error"] == "authorization_pending":
+
+    if "error" in data:
+        err = data["error"]
+        if err in ("authorization_pending", "slow_down"):
             return {"status": "pending"}
-        elif data["error"] == "slow_down":
-            return {"status": "pending"}
-        elif data["error"] == "expired_token":
-            conn.execute("UPDATE oauth_flows SET status = 'expired' WHERE id = ?", (req.flow_id,))
+        if err in ("expired_token", "access_denied"):
+            conn.execute("UPDATE oauth_flows SET status = ? WHERE id = ?", (err, req.flow_id))
             conn.commit()
-            return {"status": "expired"}
-        elif data["error"] == "access_denied":
-            conn.execute("UPDATE oauth_flows SET status = 'denied' WHERE id = ?", (req.flow_id,))
-            conn.commit()
-            return {"status": "denied"}
+            return {"status": "failed", "error": err}
 
     return {"status": "pending"}
-
-@app.get("/api/auth/oauth/status")
-def oauth_status(user: dict = Depends(get_current_user)):
-    """Get OAuth connection status for all providers."""
-    try:
-        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
-    except Exception:
-        oauth_tokens = {}
-    connected = list(oauth_tokens.keys())
-    return {"connected_providers": connected, "active_provider": user["provider"]}
 
 # ── Skills ──
 @app.get("/api/skills")
