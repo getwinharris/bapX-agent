@@ -245,10 +245,10 @@ class AdminActionResp(BaseModel):
 ALL_PROVIDERS = {
     # API Key providers
     "openai":     {"name": "OpenAI",          "auth": "api_key", "models": ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo","o1","o1-mini","o3-mini"], "base_url": "https://api.openai.com/v1"},
-    "anthropic":  {"name": "Anthropic",       "auth": "api_key", "models": ["claude-sonnet-4","claude-3.5-sonnet","claude-3-opus","claude-3-haiku"], "base_url": "https://api.anthropic.com/v1"},
+    "anthropic":  {"name": "Anthropic",       "auth": "api_key", "models": ["claude-sonnet-4","claude-3.5-sonnet","claude-3-opus","claude-3-haiku"], "base_url": "https://api.anthropic.com"},
     "google":     {"name": "Google Gemini",   "auth": "api_key", "models": ["gemini-2.0-flash","gemini-2.0-pro","gemini-1.5-pro","gemini-1.5-flash"], "base_url": "https://generativelanguage.googleapis.com/v1beta"},
     "deepseek":   {"name": "DeepSeek",        "auth": "api_key", "models": ["deepseek-chat","deepseek-reasoner"], "base_url": "https://api.deepseek.com/v1"},
-    "openrouter": {"name": "OpenRouter",      "auth": "api_key", "models": ["openrouter/auto"], "base_url": "https://openrouter.ai/api/v1"},
+    "openrouter": {"name": "OpenRouter",      "auth": "api_key", "models": ["openai/gpt-4o","openai/gpt-4o-mini","anthropic/claude-sonnet-4","google/gemini-2.0-flash","openrouter/auto"], "base_url": "https://openrouter.ai/api/v1"},
     "xai":        {"name": "xAI Grok",        "auth": "api_key", "models": ["grok-2","grok-2-vision"], "base_url": "https://api.x.ai/v1"},
     "groq":       {"name": "Groq",            "auth": "api_key", "models": ["llama-3.3-70b-versatile","mixtral-8x7b-32768","deepseek-r1-distill-llama-70b"], "base_url": "https://api.groq.com/openai/v1"},
     "mistral":    {"name": "Mistral",         "auth": "api_key", "models": ["mistral-large-latest","mistral-small-latest","codestral-latest"], "base_url": "https://api.mistral.ai/v1"},
@@ -1147,6 +1147,17 @@ async def v1_chat_completions(request: Request, user: dict = Depends(get_current
         "Authorization": f"Bearer {credential}",
         "User-Agent": PROXY_USER_AGENT,
     }
+    # OpenRouter requires Referer + X-Title headers
+    if provider == "openrouter":
+        headers["HTTP-Referer"] = "https://bapx.in"
+        headers["X-Title"] = "bapX Agent"
+    # Anthropic uses x-api-key header, not Bearer
+    if provider == "anthropic":
+        headers["x-api-key"] = credential
+        del headers["Authorization"]
+    # Ensure base_url ends with /v1 for OpenAI-compatible providers
+    if not base_url.endswith("/v1") and provider not in ("anthropic", "google", "perplexity"):
+        base_url = base_url.rstrip("/") + "/v1"
     is_stream = body.get("stream", False)
 
     try:
