@@ -14,7 +14,7 @@ let _imageChecked = false
  * Cached after first check to avoid repeated `docker image inspect` calls.
  * Returns true if build was needed, false if already present.
  */
-function ensureImage(): boolean {
+export function ensureImage(): boolean {
   if (_imageChecked) return false
   try {
     execSync('docker image inspect bapx-agent:latest 2>/dev/null', { stdio: 'ignore' })
@@ -44,7 +44,7 @@ interface SandboxInfo {
  * Container name: bapx-sandbox-{username}
  * Returns the sandbox info or null if it already exists.
  */
-function startSandbox(_userId: string, username: string, env: Record<string, string>): SandboxInfo | null {
+export function startSandbox(_userId: string, username: string, env: Record<string, string>): SandboxInfo | null {
   const containerName = `bapx-sandbox-${username}`
 
   // Check if already running

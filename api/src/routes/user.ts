@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import db from '../db.js'
 import { authMiddleware } from '../middleware/auth.js'
+import { ensureImage, startSandbox } from './sandbox.js'
 
 export async function userRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authMiddleware)
@@ -68,6 +69,28 @@ export async function userRoutes(app: FastifyInstance) {
     values.push(request.userId as string)
 
     db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values)
+
+    // Auto-start sandbox if API key was configured (fire-and-forget — non-blocking)
+    if (key !== undefined && key !== null && key !== '' && !key.startsWith('••••')) {
+      const user: any = db.prepare('SELECT id, username, name, provider, model, agent_name, soul_md FROM users WHERE id = ?').get(request.userId)
+      if (user) {
+        setImmediate(() => {
+          try {
+            ensureImage()
+            startSandbox(user.id, user.username, {
+              BAPX_API_KEY: key,
+              BAPX_PROVIDER: user.provider || 'openai',
+              BAPX_MODEL: user.model || 'gpt-4o',
+              BAPX_SOUL_MD: user.soul_md || '',
+              BAPX_AGENT_NAME: user.agent_name || 'BapX',
+              BAPX_USER_NAME: user.name || user.username,
+              BAPX_INTERNAL_API_KEY: process.env.BAPX_INTERNAL_API_KEY || '',
+            })
+          } catch { /* sandbox auto-start is best-effort */ }
+        })
+      }
+    }
+
     return { success: true }
   })
 
