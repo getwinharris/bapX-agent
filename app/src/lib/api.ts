@@ -22,12 +22,19 @@ async function request(path: string, options?: RequestInit) {
  * Calls onToken for each text chunk, onToolCall for tool calls, and onDone when finished.
  * Returns an abort function to cancel the stream.
  */
+interface ToolCall {
+  id?: string
+  type?: string
+  function?: { name: string; arguments: string }
+  [key: string]: unknown
+}
+
 function streamChat(
   message: string,
   sessionId: string | undefined,
   callbacks: {
     onToken: (text: string) => void
-    onToolCall?: (toolCall: any) => void
+    onToolCall?: (toolCall: ToolCall) => void
     onDone: (sessionId: string) => void
     onError: (error: string) => void
   }

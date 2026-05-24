@@ -31,8 +31,8 @@ export default function Signup() {
       const data = await api.auth.signup(email, password, name, { username, age, nature, agent_name: agentName, bio })
       localStorage.setItem('bapx_token', data.token)
       navigate('/')
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }

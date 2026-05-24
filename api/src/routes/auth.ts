@@ -27,11 +27,16 @@ Your agent is named **${agentName}**. ${agentName} works for you autonomously â€
 
 export async function authRoutes(app: FastifyInstance) {
   // Stricter rate limiting for auth endpoints: 10 requests per minute
-  app.post('/signup', async (request, reply) => {
+  const authRateLimit = { max: 10, timeWindow: '1 minute' }
+
+  app.post('/signup', { config: { rateLimit: authRateLimit } }, async (request, reply) => {
     const {
       username, name, email, password,
       age, nature, agent_name, bio
-    } = request.body as any
+    } = request.body as {
+      username?: string; name?: string; email?: string; password?: string;
+      age?: string; nature?: string; agent_name?: string; bio?: string;
+    }
 
     if (!username || !name || !email || !password) {
       return reply.status(400).send({ error: 'Username, name, email, and password are required' })
@@ -82,12 +87,17 @@ export async function authRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/login', async (request, reply) => {
-    const { email, password } = request.body as any
+  app.post('/login', { config: { rateLimit: authRateLimit } }, async (request, reply) => {
+    const { email, password } = request.body as { email?: string; password?: string }
     if (!email || !password) {
       return reply.status(400).send({ error: 'Email and password are required' })
     }
-    const user: any = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
+    type UserRow = {
+      id: string; username: string; name: string; email: string;
+      password_hash: string; age: string; nature: string;
+      agent_name: string; bio: string; provider: string; model: string;
+    }
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined
     if (!user) {
       return reply.status(401).send({ error: 'Invalid email or password' })
     }

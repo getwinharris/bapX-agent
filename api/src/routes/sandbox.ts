@@ -20,7 +20,7 @@ function ensureImage(): boolean {
     execSync('docker image inspect bapx-agent:latest 2>/dev/null', { stdio: 'ignore' })
     _imageChecked = true
     return false // image exists
-  } catch {
+  } catch { /* image not found — proceed to build */
     // Image not found — build it
     const buildDir = process.env.BAPX_BUILD_DIR || '/root/Dev/bapx'
     execSync(
@@ -62,7 +62,7 @@ function startSandbox(_userId: string, username: string, env: Record<string, str
       const port = parseInt(portStr) || 0
       return { name: containerName, status: 'running', port, created_at: new Date().toISOString() }
     }
-  } catch {
+  } catch { /* not running or error — proceed to create */
     // Not running — proceed to create
   }
 
@@ -119,7 +119,7 @@ function findAvailablePort(preferred: number): number {
     try {
       execSync(`ss -tln src :${port} 2>/dev/null | grep -q .`, { stdio: 'ignore', timeout: 2_000 })
       // If the command succeeds, ss found something listening on that port
-    } catch {
+    } catch { /* port not in use — it's free */
       // Command failed (grep found nothing or ss errored) — port is free
       return port
     }
@@ -132,7 +132,7 @@ function stopSandbox(containerName: string): boolean {
   try {
     execSync(`docker stop -t 5 ${containerName} 2>/dev/null && docker rm ${containerName} 2>/dev/null`, { stdio: 'ignore', timeout: 15_000 })
     return true
-  } catch {
+  } catch { /* container may not exist — treat as success */
     return false
   }
 }
@@ -173,7 +173,7 @@ export async function sandboxRoutes(app: FastifyInstance) {
         port: parseInt(portStr) || null,
         health: null
       }
-    } catch {
+    } catch { /* docker command or container not running */
       return { name: containerName, status: 'stopped', port: null, health: null }
     }
   })
@@ -230,7 +230,7 @@ export async function sandboxRoutes(app: FastifyInstance) {
       })
       const data = await res.json()
       return { status: 'running', health: data }
-    } catch {
+    } catch { /* container not running or health check failed */
       return { status: 'not_running' }
     }
   })

@@ -49,7 +49,7 @@ function getSandboxEndpoint(username: string): string | null {
     const endpoint = health ? `http://127.0.0.1:${portStr}` : null
     sandboxCache.set(username, { endpoint, ts: Date.now() })
     return endpoint
-  } catch {
+  } catch { /* sandbox not found or not responding — cache as null */
     sandboxCache.set(username, { endpoint: null, ts: Date.now() })
     return null
   }

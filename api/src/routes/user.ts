@@ -6,12 +6,18 @@ export async function userRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authMiddleware)
 
   app.get('/profile', async (request, reply) => {
-    const user: any = db.prepare(
+    type ProfileRow = {
+      id: string; username: string; name: string; email: string;
+      age: string; nature: string; agent_name: string; bio: string;
+      soul_md: string; provider: string; model: string;
+    }
+    const user = db.prepare(
       'SELECT id, username, name, email, age, nature, agent_name, bio, soul_md, provider, model FROM users WHERE id = ?'
-    ).get(request.userId)
+    ).get(request.userId) as ProfileRow | undefined
     if (!user) return reply.status(404).send({ error: 'User not found' })
     // Fetch API key separately to avoid accidental logging exposure
-    const keyRow: any = db.prepare('SELECT api_key FROM users WHERE id = ?').get(request.userId)
+    type KeyRow = { api_key: string }
+    const keyRow = db.prepare('SELECT api_key FROM users WHERE id = ?').get(request.userId) as KeyRow | undefined
     return {
       id: user.id, username: user.username, name: user.name,
       email: user.email, age: user.age, nature: user.nature,
@@ -24,9 +30,9 @@ export async function userRoutes(app: FastifyInstance) {
   })
 
   app.put('/api-key', async (request, reply) => {
-    const { provider, key, model } = request.body as any
+    const { provider, key, model } = request.body as { provider?: string; key?: string; model?: string }
     const updates: string[] = []
-    const values: any[] = []
+    const values: (string | number)[] = []
 
     // Only update the key if a new one is provided (not masked)
     if (key !== undefined && key !== null && key !== '') {
@@ -59,7 +65,7 @@ export async function userRoutes(app: FastifyInstance) {
     }
 
     updates.push("updated_at = datetime('now')")
-    values.push(request.userId)
+    values.push(request.userId as string)
 
     db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values)
     return { success: true }
