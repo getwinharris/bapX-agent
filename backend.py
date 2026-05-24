@@ -20,6 +20,8 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from agent_runtime import stream_agent_response
 from sandbox_manager import start_sandbox, stop_sandbox, get_sandbox_status, exec_in_sandbox
+from agent_orchestrator import route_user_message
+from opensandbox import Sandbox
 
 # ── Config ──
 JWT_SECRET: str = os.environ.get("BAPX_JWT_SECRET", "")
@@ -40,12 +42,61 @@ conn.execute("PRAGMA journal_mode=WAL")
 conn.execute("PRAGMA busy_timeout=5000")
 conn.execute("PRAGMA foreign_keys=ON")
 
-conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL DEFAULT '', email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, age TEXT DEFAULT '', nature TEXT DEFAULT '', agent_name TEXT DEFAULT 'BapX', bio TEXT DEFAULT '', soul_md TEXT DEFAULT '', api_key TEXT DEFAULT '', provider TEXT DEFAULT 'openai', model TEXT DEFAULT '', oauth_tokens TEXT DEFAULT '{}', skills_enabled TEXT DEFAULT '[]', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))")
+conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL DEFAULT '', email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, age TEXT DEFAULT '', nature TEXT DEFAULT '', agent_name TEXT DEFAULT 'BapX', bio TEXT DEFAULT '', soul_md TEXT DEFAULT '', api_key TEXT DEFAULT '', provider TEXT DEFAULT 'openai', model TEXT DEFAULT '', oauth_tokens TEXT DEFAULT '{}', skills_enabled TEXT DEFAULT '[]', is_admin INTEGER DEFAULT 0, banned INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))")
 conn.execute("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT DEFAULT 'New Chat', messages TEXT DEFAULT '[]', created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
 conn.execute("CREATE TABLE IF NOT EXISTS oauth_flows (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL, device_code TEXT NOT NULL, user_code TEXT NOT NULL, verification_uri TEXT NOT NULL, status TEXT DEFAULT 'pending', expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
 conn.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, session_id TEXT NOT NULL DEFAULT '', key TEXT NOT NULL, value TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
+# Admin tables
+conn.execute("CREATE TABLE IF NOT EXISTS admin_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')))")
+conn.execute("CREATE TABLE IF NOT EXISTS admin_mail (id INTEGER PRIMARY KEY AUTOINCREMENT, from_addr TEXT NOT NULL, to_addr TEXT NOT NULL, subject TEXT, body TEXT, read INTEGER DEFAULT 0, received_at TEXT DEFAULT (datetime('now')))")
+conn.execute("CREATE TABLE IF NOT EXISTS admin_notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, severity TEXT DEFAULT 'info', read INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))")
+conn.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, session_id TEXT NOT NULL DEFAULT '', key TEXT NOT NULL, value TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
 conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)")
 conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id)")
+conn.execute("""CREATE TABLE IF NOT EXISTS sandboxes (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    sandbox_id TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)""")
+# Add sandbox_id column to users if not present (idempotent migration)
+try:
+    conn.execute("ALTER TABLE users ADD COLUMN sandbox_id TEXT DEFAULT ''")
+except Exception:
+    pass
+conn.commit()
+for col_sql in [
+    "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0",
+]:
+    try: conn.execute(col_sql)
+    except: pass
+conn.commit()
+
+# ── Seed admin user ──
+admin_exists = conn.execute("SELECT id FROM users WHERE is_admin = 1").fetchone()
+if not admin_exists:
+    admin_pw = os.environ.get("BAPX_ADMIN_PASSWORD", "admin123")
+    admin_uid = uuid.uuid4().hex
+    conn.execute("INSERT INTO users (id, username, name, email, password_hash, is_admin) VALUES (?, ?, ?, ?, ?, 1)",
+        (admin_uid, "admin", "Admin", "admin@bapx.in", hashlib.sha256(admin_pw.encode()).hexdigest()))
+    conn.commit()
+    print(f"[Admin] Seeded admin user: admin@bapx.in (pw: {'[ENV]' if 'BAPX_ADMIN_PASSWORD' in os.environ else 'admin123'})")
+
+# Seed default admin config
+DEFAULT_CONFIG = {
+    "stripe_secret_key": "", "stripe_webhook_secret": "",
+    "google_oauth_client_id": "", "google_oauth_client_secret": "",
+    "smtp_host": "", "smtp_port": "587", "smtp_user": "", "smtp_pass": "",
+    "admin_email": "", "billing_plan_base_price": "5",
+    "billing_storage_price_per_gb": "1",
+}
+for k, v in DEFAULT_CONFIG.items():
+    existing = conn.execute("SELECT key FROM admin_config WHERE key = ?", (k,)).fetchone()
+    if not existing:
+        conn.execute("INSERT INTO admin_config (key, value) VALUES (?, ?)", (k, v))
 conn.commit()
 
 # ── FastAPI App ──
@@ -80,6 +131,35 @@ def get_current_user(request: Request) -> dict:
     if not user:
         raise HTTPException(401, "User not found")
     return dict(user)
+
+def get_admin_user(request: Request) -> dict:
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Missing or invalid token")
+    try:
+        payload = jwt.decode(auth[7:], JWT_SECRET, algorithms=[JWT_ALGO])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except Exception:
+        raise HTTPException(401, "Invalid token")
+    user = conn.execute("SELECT * FROM users WHERE id = ? AND is_admin = 1", (payload["sub"],)).fetchone()
+    if not user:
+        raise HTTPException(403, "Admin access required")
+    return dict(user)
+
+def mask_value(val: str) -> str:
+    """Mask sensitive config values for GET responses."""
+    s = val.strip()
+    if not s:
+        return ""
+    if len(s) <= 8:
+        return "••••"
+    return s[:4] + "••••" + s[-4:]
+
+def create_notification(type_: str, title: str, message: str, severity: str = "info"):
+    conn.execute("INSERT INTO admin_notifications (type, title, message, severity) VALUES (?, ?, ?, ?)",
+                 (type_, title, message, severity))
+    conn.commit()
 
 # ── Pydantic Models ──
 class SignupReq(BaseModel):
@@ -139,6 +219,25 @@ class SandboxStartReq(BaseModel):
 class SandboxExecReq(BaseModel):
     command: str
     language: str = "bash"
+
+# ── Admin Models ──
+class AdminLoginReq(BaseModel):
+    email: str
+    password: str
+
+class ConfigUpdateReq(BaseModel):
+    key: str
+    value: str
+
+class AdminNotificationCreate(BaseModel):
+    type: str
+    title: str
+    message: str
+    severity: str = "info"
+
+class AdminActionResp(BaseModel):
+    status: str
+    message: str = ""
 
 # ── ALL providers (matching Hermes) ──
 ALL_PROVIDERS = {
@@ -251,7 +350,7 @@ def get_default_skills() -> list[dict]:
 # ── Auth ──
 @app.post("/api/signup")
 @limiter.limit("10/minute")
-def signup(req: SignupReq, request: Request):
+async def signup(req: SignupReq, request: Request):
     if len(req.password) < 8:
         raise HTTPException(400, "Password must be 8+ characters")
     if not all(c.isalnum() or c in '_-' for c in req.username) or len(req.username) < 3:
@@ -287,6 +386,29 @@ Your agent works for you autonomously — executing tasks, managing memory, buil
          hashlib.sha256(req.password.encode()).hexdigest(), req.age, req.nature,
          agent_name, req.bio, soul))
     conn.commit()
+    # Create OpenSandbox sandbox for new user
+    sandbox_id = ""
+    try:
+        sandbox_conn_cfg = type("ConnectionConfig", (), {
+            "get_base_url": lambda self: "http://127.0.0.1:8080",
+            "get_api_key": lambda self: "",
+        })()
+        sb = await Sandbox.create(
+            "ubuntu",
+            connection_config=sandbox_conn_cfg,
+            resource={"cpu": "500m", "memory": "1Gi"},
+            metadata={"user_id": uid, "name": req.username},
+            timeout=timedelta(hours=1),
+            skip_health_check=True,
+        )
+        sandbox_id = getattr(sb, "sandbox_id", getattr(sb, "id", ""))
+        if sandbox_id:
+            conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (sandbox_id, uid))
+            conn.execute("INSERT INTO sandboxes (id, user_id, sandbox_id, status) VALUES (?, ?, ?, 'running')",
+                         (uuid.uuid4().hex, uid, sandbox_id))
+            conn.commit()
+    except Exception as e:
+        print(f"[Sandbox] Signup sandbox creation skipped: {e}")
     return {"token": make_token(uid), "user": {
         "id": uid, "username": req.username, "name": req.name,
         "email": req.email, "provider": "openai", "model": ""
@@ -548,42 +670,30 @@ def save_user_skills(req: SkillsUpdate, user: dict = Depends(get_current_user)):
 # ── Chat ──
 @app.post("/api/chat/send")
 async def chat_send(req: ChatSend, user: dict = Depends(get_current_user)):
-    """Direct LLM call via user's configured auth method."""
+    """Route message through agent orchestrator with sandbox context."""
     provider = user.get("provider", "openai")
     model = user.get("model", "gpt-4o")
 
-    # Get auth credential
-    api_key = user.get("api_key", "")
-    try:
-        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
-    except Exception:
-        oauth_tokens = {}
-
-    provider_info = ALL_PROVIDERS.get(provider, ALL_PROVIDERS["openai"])
-
-    # Resolve base URL
-    if provider_info["auth"] == "api_key":
-        base_url = provider_info.get("base_url", "https://api.openai.com/v1")
-        if not api_key:
-            raise HTTPException(400, f"Configure an API key for {provider_info['name']} in Settings")
-        auth_header = f"Bearer {api_key}"
-    elif provider_info["auth"] == "oauth":
-        token = oauth_tokens.get(provider)
-        if not token:
-            raise HTTPException(400, f"Connect {provider_info['name']} via OAuth in Settings")
-        auth_header = f"Bearer {token}"
-        base_url = provider_info.get("base_url", "https://api.openai.com/v1")
-    elif provider_info["auth"] == "copilot":
-        token = oauth_tokens.get(provider)
-        if not token:
-            raise HTTPException(400, "Connect GitHub Copilot via OAuth in Settings")
-        auth_header = f"Bearer {token}"
-        base_url = "https://api.githubcopilot.com/v1"
-    else:
-        base_url = "https://api.openai.com/v1"
-        if not api_key:
-            raise HTTPException(400, "Configure an API key in Settings")
-        auth_header = f"Bearer {api_key}"
+    # Check/setup sandbox for this user
+    sandbox_id = user.get("sandbox_id", "")
+    if not sandbox_id:
+        # Check in-memory registry
+        from sandbox_manager import get_sandbox_status
+        sb_status = await get_sandbox_status(user["id"])
+        if sb_status.get("sandbox_id"):
+            sandbox_id = sb_status["sandbox_id"]
+            conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (sandbox_id, user["id"]))
+            conn.commit()
+        else:
+            # Try creating a sandbox
+            try:
+                sb_result = await start_sandbox(user["id"], user["username"])
+                if "sandbox_id" in sb_result:
+                    sandbox_id = sb_result["sandbox_id"]
+                    conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (sandbox_id, user["id"]))
+                    conn.commit()
+            except Exception:
+                pass
 
     # Save message to session
     sid = req.session_id or uuid.uuid4().hex
@@ -594,48 +704,54 @@ async def chat_send(req: ChatSend, user: dict = Depends(get_current_user)):
                           (sid, user["id"])).fetchone()
     messages = json.loads(session["messages"]) if session else []
     messages.append({"role": "user", "content": req.message})
+    conn.execute("UPDATE sessions SET messages = ? WHERE id = ?", (json.dumps(messages), sid))
+    conn.commit()
+
+    # Get auth credential for the orchestrator
+    api_key = user.get("api_key", "")
+    try:
+        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
+    except Exception:
+        oauth_tokens = {}
+    credential = api_key or oauth_tokens.get(provider, "")
+    if credential:
+        os.environ["OPENAI_API_KEY"] = credential
+    if provider in ("anthropic", "deepseek", "openrouter", "groq", "mistral"):
+        prov_urls = {
+            "anthropic": "https://api.anthropic.com/v1",
+            "deepseek": "https://api.deepseek.com/v1",
+            "openrouter": "https://openrouter.ai/api/v1",
+            "groq": "https://api.groq.com/openai/v1",
+            "mistral": "https://api.mistral.ai/v1",
+        }
+        os.environ["OPENAI_BASE_URL"] = prov_urls.get(provider, "https://api.openai.com/v1")
 
     async def stream():
-        async with httpx.AsyncClient() as client:
+        full_response = ""
+        async for chunk in route_user_message(
+            req.message,
+            user_id=user["id"],
+            sandbox_id=sandbox_id,
+            conversation_history=messages[:-1],  # Exclude current message
+        ):
+            yield chunk
             try:
-                full_response = ""
-                async with client.stream("POST",
-                    f"{base_url}/chat/completions",
-                    headers={
-                        "Authorization": auth_header,
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": model,
-                        "messages": messages,
-                        "stream": True,
-                    } if provider != "anthropic" else {
-                        "model": model,
-                        "messages": messages,
-                        "stream": True,
-                    },
-                    timeout=120,
-                ) as resp:
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: "):
-                            data = line[6:]
-                            if data == "[DONE]":
-                                break
-                            yield f"data: {data}\n\n"
-                            try:
-                                chunk = json.loads(data)
-                                if chunk.get("choices") and chunk["choices"][0].get("delta", {}).get("content"):
-                                    full_response += chunk["choices"][0]["delta"]["content"]
-                            except Exception:
-                                pass
-                # Save response
-                messages.append({"role": "assistant", "content": full_response or "(empty response)"})
-                conn.execute("UPDATE sessions SET messages = ? WHERE id = ?",
-                            (json.dumps(messages), sid))
-                conn.commit()
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-        yield "data: [DONE]\n\n"
+                prefix = "data: "
+                if chunk.startswith(prefix):
+                    data = json.loads(chunk[len(prefix):])
+                    if "text" in data:
+                        full_response += data["text"]
+                    elif "final" in data:
+                        full_response = data["final"]
+            except (json.JSONDecodeError, IndexError):
+                pass
+
+        # Save response
+        if full_response:
+            messages.append({"role": "assistant", "content": full_response})
+            conn.execute("UPDATE sessions SET messages = ? WHERE id = ?",
+                        (json.dumps(messages), sid))
+            conn.commit()
 
     return StreamingResponse(stream(), media_type="text/event-stream",
         headers={"X-Session-Id": sid})
@@ -799,6 +915,156 @@ async def sandbox_exec(req: SandboxExecReq, user: dict = Depends(get_current_use
     if "error" in result:
         raise HTTPException(400, result["error"])
     return result
+
+# ── Admin Routes ──
+@app.post("/api/admin/login")
+def admin_login(req: AdminLoginReq):
+    user = conn.execute("SELECT * FROM users WHERE email = ? AND is_admin = 1", (req.email,)).fetchone()
+    if not user or not hashlib.sha256(req.password.encode()).hexdigest() == user["password_hash"]:
+        raise HTTPException(401, "Invalid admin credentials")
+    return {"token": make_token(user["id"]), "user": {"id": user["id"], "name": user["name"], "email": user["email"], "role": "admin"}}
+
+@app.get("/api/admin/stats")
+def admin_stats(admin: dict = Depends(get_admin_user)):
+    total_users = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
+    active_users = conn.execute("SELECT COUNT(*) as c FROM users WHERE banned = 0").fetchone()["c"]
+    banned_users = conn.execute("SELECT COUNT(*) as c FROM users WHERE banned = 1").fetchone()["c"]
+    signups_today = conn.execute("SELECT COUNT(*) as c FROM users WHERE created_at >= datetime('now', 'start of day')").fetchone()["c"]
+    total_sessions = conn.execute("SELECT COUNT(*) as c FROM sessions").fetchone()["c"]
+    notif_unread = conn.execute("SELECT COUNT(*) as c FROM admin_notifications WHERE read = 0").fetchone()["c"]
+    return {"total_users": total_users, "active_users": active_users, "banned_users": banned_users, "signups_today": signups_today, "total_sessions": total_sessions, "notifications_unread": notif_unread}
+
+@app.get("/api/admin/users")
+def admin_users(search: str = "", page: int = 1, limit: int = 20, admin: dict = Depends(get_admin_user)):
+    offset = (page - 1) * limit
+    if search:
+        rows = conn.execute("SELECT id, username, name, email, provider, is_admin, banned, created_at FROM users WHERE username LIKE ? OR email LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?", (f"%{search}%", f"%{search}%", limit, offset)).fetchall()
+        total = conn.execute("SELECT COUNT(*) as c FROM users WHERE username LIKE ? OR email LIKE ?", (f"%{search}%", f"%{search}%")).fetchone()["c"]
+    else:
+        rows = conn.execute("SELECT id, username, name, email, provider, is_admin, banned, created_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
+        total = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
+    return {"users": [dict(r) for r in rows], "total": total, "page": page, "pages": max(1, (total + limit - 1) // limit)}
+
+@app.get("/api/admin/users/{user_id}")
+def admin_user_detail(user_id: str, admin: dict = Depends(get_admin_user)):
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not user: raise HTTPException(404, "User not found")
+    u = dict(user)
+    u["api_key"] = "••••" + u["api_key"][-4:] if u.get("api_key") else ""
+    u["oauth_tokens"] = {k: "••••" for k in (json.loads(u["oauth_tokens"]) if u.get("oauth_tokens") else {}).keys()}
+    return u
+
+@app.post("/api/admin/users/{user_id}/ban")
+def admin_ban_user(user_id: str, admin: dict = Depends(get_admin_user)):
+    conn.execute("UPDATE users SET banned = 1 WHERE id = ?", (user_id,))
+    conn.commit()
+    create_notification("user_banned", f"User banned", f"User {user_id} was banned by admin", "warning")
+    return {"status": "banned", "message": f"User {user_id} banned and sandbox will be cleared"}
+
+@app.post("/api/admin/users/{user_id}/unban")
+def admin_unban_user(user_id: str, admin: dict = Depends(get_admin_user)):
+    conn.execute("UPDATE users SET banned = 0 WHERE id = ?", (user_id,))
+    conn.commit()
+    return {"status": "unbanned"}
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: str, admin: dict = Depends(get_admin_user)):
+    conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM memories WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM oauth_flows WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    create_notification("user_deleted", "User deleted", f"User {user_id} and all data deleted by admin", "info")
+    return {"status": "deleted"}
+
+@app.get("/api/admin/config")
+def admin_get_config(admin: dict = Depends(get_admin_user)):
+    rows = conn.execute("SELECT key, value FROM admin_config ORDER BY key").fetchall()
+    config = {}
+    for r in rows:
+        val = r["value"]
+        # Mask sensitive keys
+        if any(k in r["key"] for k in ["secret", "password", "key", "token"]):
+            val = mask_value(val)
+        config[r["key"]] = val
+    return {"config": config}
+
+@app.post("/api/admin/config")
+def admin_set_config(req: ConfigUpdateReq, admin: dict = Depends(get_admin_user)):
+    conn.execute("INSERT OR REPLACE INTO admin_config (key, value, updated_at) VALUES (?, ?, datetime('now'))", (req.key, req.value))
+    conn.commit()
+    return {"status": "ok", "key": req.key}
+
+@app.get("/api/admin/config/check/{key}")
+def admin_check_config(key: str, admin: dict = Depends(get_admin_user)):
+    row = conn.execute("SELECT value FROM admin_config WHERE key = ?", (key,)).fetchone()
+    has_value = bool(row and row["value"])
+    return {"key": key, "configured": has_value}
+
+@app.get("/api/admin/notifications")
+def admin_get_notifications(admin: dict = Depends(get_admin_user)):
+    rows = conn.execute("SELECT * FROM admin_notifications ORDER BY read ASC, created_at DESC LIMIT 50").fetchall()
+    return {"notifications": [dict(r) for r in rows]}
+
+@app.post("/api/admin/notifications/{notif_id}/read")
+def admin_read_notification(notif_id: int, admin: dict = Depends(get_admin_user)):
+    conn.execute("UPDATE admin_notifications SET read = 1 WHERE id = ?", (notif_id,))
+    conn.commit()
+    return {"status": "ok"}
+
+@app.post("/api/admin/notifications/read-all")
+def admin_read_all_notifications(admin: dict = Depends(get_admin_user)):
+    conn.execute("UPDATE admin_notifications SET read = 1 WHERE read = 0")
+    conn.commit()
+    return {"status": "ok"}
+
+@app.get("/api/admin/mail")
+def admin_get_mail(admin: dict = Depends(get_admin_user)):
+    rows = conn.execute("SELECT * FROM admin_mail ORDER BY received_at DESC LIMIT 50").fetchall()
+    return {"mail": [dict(r) for r in rows]}
+
+@app.get("/api/admin/mail/{mail_id}")
+def admin_get_mail_detail(mail_id: int, admin: dict = Depends(get_admin_user)):
+    row = conn.execute("SELECT * FROM admin_mail WHERE id = ?", (mail_id,)).fetchone()
+    if not row: raise HTTPException(404, "Mail not found")
+    return dict(row)
+
+@app.post("/api/admin/mail/{mail_id}/read")
+def admin_read_mail(mail_id: int, admin: dict = Depends(get_admin_user)):
+    conn.execute("UPDATE admin_mail SET read = 1 WHERE id = ?", (mail_id,))
+    conn.commit()
+    return {"status": "ok"}
+
+@app.delete("/api/admin/mail/{mail_id}")
+def admin_delete_mail(mail_id: int, admin: dict = Depends(get_admin_user)):
+    conn.execute("DELETE FROM admin_mail WHERE id = ?", (mail_id,))
+    conn.commit()
+    return {"status": "deleted"}
+
+@app.post("/api/admin/automation/cleanup-banned")
+def admin_cleanup_banned(admin: dict = Depends(get_admin_user)):
+    banned = conn.execute("SELECT id, username FROM users WHERE banned = 1").fetchall()
+    for u in banned:
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (u["id"],))
+        conn.execute("DELETE FROM memories WHERE user_id = ?", (u["id"],))
+        conn.execute("DELETE FROM oauth_flows WHERE user_id = ?", (u["id"],))
+    conn.execute("INSERT INTO automation_log (action, status, details) VALUES ('cleanup_banned', 'completed', ?)", (json.dumps([dict(u) for u in banned]),))
+    conn.commit()
+    return {"status": "ok", "cleaned": len(banned), "users": [dict(u) for u in banned]}
+
+@app.post("/api/admin/automation/clear-cache")
+def admin_clear_cache(admin: dict = Depends(get_admin_user)):
+    # Clear skills cache
+    global DEFAULT_SKILLS_CACHE
+    DEFAULT_SKILLS_CACHE = None
+    conn.execute("INSERT INTO automation_log (action, status, details) VALUES ('clear_cache', 'completed', 'Skills cache cleared')")
+    conn.commit()
+    return {"status": "ok", "message": "Cache cleared"}
+
+@app.get("/api/admin/automation/logs")
+def admin_automation_logs(admin: dict = Depends(get_admin_user)):
+    rows = conn.execute("SELECT * FROM automation_log ORDER BY created_at DESC LIMIT 50").fetchall()
+    return {"logs": [dict(r) for r in rows]}
 
 # ── Health ──
 @app.get("/health")

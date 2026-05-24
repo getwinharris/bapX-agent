@@ -1,134 +1,72 @@
-# bapX — Codex Build Spec
-## CTO: Codex CLI | Product: bapX (browser AI agent platform)
+# bapX Build Spec — Phase 2: Integrate the Full Stack
 
-## PROJECT LOCATION
-/root/Dev/bapx/
-- Backend: /root/Dev/bapx/backend.py (Python FastAPI, port 7654, already running)
-- Frontend: /root/Dev/bapx/static/dashboard.html (pure HTML/CSS/JS, being built now)
-- Reference docs: /root/Dev/bapx/reference/ (hermes-docs, manus-docs, openai-agents-docs, opensandbox-docs)
+## Objective
+Wire OpenAI Agents SDK, OpenSandbox, and Codex CLI into the actual bapX product. Currently they're installed but not connected. When a user signs up, they should get an isolated sandbox. When they chat, their message should go through Codex CLI in their sandbox, orchestrated by OpenAI Agents SDK.
 
-## STACK (NO EXCEPTIONS)
-- Python (FastAPI) — backend only
-- HTML + CSS + vanilla JS — frontend only
-- NO React, NO Node.js backend, NO TypeScript, NO frameworks
+## What to build
 
-## WHAT EXISTS (backend.py)
-- User auth: signup/login with JWT
-- ALL model providers: 18 API key + 4 OAuth (ChatGPT/Claude/Grok/Gemini/Nous/Qwen/Copilot)
-- OAuth device flow endpoints (start, poll, status)
-- 101 default skills loaded from Hermes skill dirs
-- Chat streaming via SSE + OpenAI-compatible API calls
-- Session management (list, get, delete)
+### 1. OpenSandbox per-user on signup
+In `backend.py`, modify the signup flow to create an OpenSandbox sandbox for each new user.
+- Import OpenSandbox: `from opensandbox import Sandbox, ConnectionConfig`
+- On signup success, create a sandbox: `Sandbox.create("ubuntu", connection_config=ConnectionConfig(...))`
+- Store the sandbox_id in the user's database record (add a `sandbox_id TEXT` column to users table)
+- Set resource limits per user: `resourceLimits: { cpu: "500m", memory: "1Gi" }`
+- On account cleanup, destroy the sandbox
 
-## WHAT NEEDS TO BE BUILT
+### 2. OpenAI Agents SDK agent team
+Create a new file `agent_orchestrator.py` that uses OpenAI Agents SDK to build agent teams.
+- Import: `from agents import Agent, Runner, function_tool`
+- Create a CodexAgent that delegates tasks to Codex CLI
+- Create a TTSAgent that calls the TTS endpoint
+- Create a MemoryAgent that handles cross-session memory
+- Create a team/router that takes user messages and routes them to the right agent
 
-### 1. DASHBOARD (static/dashboard.html)
-A single self-contained HTML file. Replace the current one.
+### 3. Wire chat through Codex CLI in sandbox
+Modify the `POST /api/chat/send` endpoint:
+- Look up the user's sandbox_id
+- If sandbox exists, send the message into the sandbox: run `codex exec "user message"` inside the sandbox
+- If no sandbox, create one
+- Stream the Codex output back via SSE
+- Use OpenAI Agents SDK Runner to coordinate
 
-**Pages (hash-based routing):**
-- #login — Email + password form → POST /api/login → store token → #dashboard
-- #signup — All fields form → POST /api/signup → store token → #dashboard
-- #dashboard — 3-column layout (sidebar | chat | right panel)
+### 4. Add sandbox status endpoint
+Add GET /api/sandbox/status that returns:
+- Whether user's sandbox exists
+- Sandbox state (running/paused/terminated)
+- Resource usage (CPU, memory)
 
-**3-Column Layout:**
-- LEFT SIDEBAR (desktop: w-64, mobile: w-12 icon rail):
-  * Logo "bapX" with purple gradient (#9651b8)
-  * Nav items with SVG icons: Chat, Settings (gear), Skills (book)
-  * Bottom: user avatar circle (initials) + username
-  * MOBILE: icons only (w-12), tap expands to w-64 with backdrop overlay. State in localStorage.
+### 5. Add sandbox_management table
+Add a SQLite table for sandboxes:
+```sql
+CREATE TABLE IF NOT EXISTS sandboxes (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    sandbox_id TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)
+```
 
-- CENTER CHAT:
-  * Messages area — scrollable, user msg right-aligned purple, assistant left-aligned dark card
-  * SSE streaming — append content as chunks arrive, show spinner while waiting
-  * Input bar — textarea + send button
-  * Session selector dropdown in header
-  * New session button
+## Files to modify/create
+- `/root/Dev/bapx/backend.py` — modify signup, chat endpoint, add sandbox status endpoint
+- `/root/Dev/bapx/agent_orchestrator.py` — NEW: OpenAI Agents SDK agent team
+- `/root/Dev/bapx/main.py` — may need to import agent_orchestrator
 
-- RIGHT PANEL (w-320):
-  * Tabs: Canvas | Browser | Terminal
-  * Placeholder content per tab (just icons + "Canvas" / "Browser" / "Terminal" text)
-  * Resizable divider between center and right panels (drag to resize)
-  * Mobile: hidden by default, can slide open
+## Constraints
+- Pure Python FastAPI — no Node.js
+- OpenSandbox SDK is at `pip show opensandbox` version 0.1.9
+- OpenAI Agents SDK is at `pip show openai-agents` version 0.17.3
+- Codex CLI is at `~/.hermes/node/bin/codex`
+- API key for Codex: `export CODEX_API_KEY=hermes-codex-bridge`
+- All existing endpoints must keep working
 
-**Settings View (replaces chat area when gear clicked):**
-A) Model Connection section:
-   - Current connection status display (shows provider name + connected/disconnected badge)
-   - API Key provider dropdown (loaded from GET /api/providers)
-   - Model dropdown (changes based on selected provider)
-   - API key input (password field) + Save button
-   - OAuth provider cards for: ChatGPT, Nous, Qwen, Copilot
-   - Clicking OAuth card → POST /api/auth/oauth/start → shows modal with user_code + verification_uri + polling spinner
-   - Polls POST /api/auth/oauth/poll every 3s → shows "Connected ✓" when done
+## Git
+Git is authenticated at https://github.com/getwinharris/bapX-agent.git.
+Commit and push: `git add -A && git commit -m "phase2: integrate OpenSandbox + OpenAI Agents SDK + Codex CLI" && git push`
 
-B) Skills Browser section:
-   - Search bar to filter skills
-   - Grid of skill cards (name, description, category badge, toggle switch)
-   - "Save Skills" button → POST /api/user/skills
-   - Shows "X of Y skills enabled" count
-
-**API calls:** All use fetch() with Bearer token from localStorage('bapx_token'). Token checked on load. Auth errors → #login.
-
-**Styling:**
-- Dark theme: #0f0f13 bg, #e8e8f0 text, #9651b8 accent
-- Inter font from Google Fonts
-- Glass-morphism cards (rgba background, subtle borders)
-- Smooth transitions on sidebar expand/collapse
-- Scrollbar styling
-- All CSS inline in <style> tag
-- All JS inline in <script> tag
-- NO external CSS/JS files except Inter font
-
-### 2. AGENT RUNTIME INTEGRATION (new files in /root/Dev/bapx/)
-
-Create /root/Dev/bapx/agent_runtime.py:
-A Python module that:
-- Uses OpenAI Agents SDK (pip installed: openai-agents==0.17.3) to create agents
-- Each user gets an Agent with their configured provider/model
-- Agent has tools: execute_code (run Python), web_search (via requests), file_operations
-- Agent instructions come from user's SOUL.md (stored in DB as soul_md field)
-- Implements a /api/agent/run endpoint in backend.py that:
-  * Takes user message, session_id
-  * Creates Agent with user's model config (API key or OAuth token)
-  * Runs the agent with the conversation history
-  * Streams responses back via SSE
-  * Saves conversation to session
-
-Create /root/Dev/bapx/sandbox_manager.py:
-A module that manages per-user sandboxes via OpenSandbox:
-- Uses opensandbox==0.1.9 SDK (pip installed)
-- start_sandbox(user_id): creates sandbox via OpenSandbox API
-- stop_sandbox(user_id): stops sandbox
-- exec_in_sandbox(user_id, command): runs command in user's sandbox
-- Sandbox contains Codex CLI for autonomous coding tasks
-- Sandbox contains basic dev tools (python3, pip, git, curl)
-
-### 3. BACKEND UPGRADE (modify backend.py)
-
-Add to backend.py:
-- Import and register agent_runtime routes
-- Import and register sandbox_manager routes
-- Add /api/agent/run endpoint (delegates to agent_runtime)
-- Add /api/sandbox/* endpoints (start, stop, status, exec)
-- Update GET /api/user/profile to include sandbox status
-
-### 4. COMPETITOR ANALYSIS REFERENCE
-Competitors documented in /root/Dev/bapx/reference/:
-- Manus.im: browser operator, cloud browser, collab, design view, mail, meeting minutes, multi-modal, projects, skills, slides, wide research, MCP connectors, website builder, access control, payments, analytics, SEO, GitHub integration, Figma import
-- Hermes Agent: 20+ LLM providers, OAuth, gateway (Telegram/Discord/Slack/etc), skills, cron, delegation, memory, MCP, kanban, ACP
-
-### 5. GIT WORKFLOW
-- After building, commit all changes
-- Use git push with OAuth token: git push https://getwinharris:***@github.com/getwinharris/bapX-agent.git main
-
-## BUILD ORDER
-1. First: Upgrade dashboard.html (the user-facing UI)
-2. Second: Create agent_runtime.py (the core agent execution)
-3. Third: Create sandbox_manager.py (sandbox management)
-4. Fourth: Modify backend.py to wire everything together
-5. Fifth: Git commit + push
-
-## VERIFICATION
-- After each file: check syntax (python3 -c "compile('file.py', 'file', 'exec')")
-- After dashboard: open in browser and verify login/signup/dashboard render
-- After backend upgrade: curl -s http://localhost:7654/health
-- After push: verify on github.com/getwinharris/bapX-agent
+## Verification
+1. Backend starts: uvicorn main:app --port 7654
+2. Signup creates sandbox: check GET /api/sandbox/status after signup
+3. Health: curl http://localhost:7654/health returns 200
+4. Chat works: POST /api/chat/send with message returns SSE stream

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bapX Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#07070d;--bg2:#0a0a14;--surface:#0f0f1a;--fg:#e8e4dc;--muted:#6a665e;--accent:#0088ff;--accent2:#0066dd;--border:rgba(255,255,255,0.06);--radius:8px;--radius-lg:12px;--green:#00c853;--red:#ef4444;--yellow:#fbbf24;--orange:#f97316}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;overflow:hidden;height:100vh}
+input,select,textarea,button{font-family:inherit}
+::selection{background:rgba(0,136,255,0.2)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06);border-radius:3px}
+.hidden{display:none!important}
+
+/* Login */
+.auth-screen{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg)}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2.5rem;width:100%;max-width:380px}
+.auth-card h1{font-size:1.5rem;font-weight:700;margin-bottom:.25rem}
+.auth-card h1 span{color:var(--accent)}
+.auth-card p{color:var(--muted);font-size:.8125rem;margin-bottom:1.5rem}
+.auth-card label{display:block;font-size:.8125rem;font-weight:500;margin-bottom:.375rem;color:var(--fg)}
+.auth-card input{width:100%;padding:.625rem .75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--fg);font-size:.875rem;outline:none;margin-bottom:1rem}
+.auth-card input:focus{border-color:var(--accent)}
+.auth-card .btn{width:100%;padding:.625rem;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .2s}
+.auth-card .btn:hover{background:var(--accent2)}
+.auth-card .error{background:rgba(239,68,68,0.1);color:var(--red);padding:.5rem .75rem;border-radius:var(--radius);font-size:.8125rem;margin-bottom:1rem;display:none}
+
+/* Admin Layout */
+.admin-layout{display:flex;height:100vh}
+.sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.sidebar-header{padding:.75rem 1rem;border-bottom:1px solid var(--border)}
+.sidebar-header .logo{font-size:1.125rem;font-weight:800;letter-spacing:-0.02em}
+.sidebar-header .logo span{color:var(--accent)}
+.sidebar-header .sub{font-size:.6875rem;color:var(--muted);margin-top:2px}
+.sidebar-nav{flex:1;padding:.5rem;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:.625rem;padding:.5rem .75rem;border-radius:var(--radius);cursor:pointer;transition:all .15s;font-size:.8125rem;font-weight:500;color:var(--muted);margin-bottom:2px}
+.nav-item:hover{background:rgba(255,255,255,0.03);color:var(--fg)}
+.nav-item.active{background:rgba(0,136,255,0.08);color:var(--accent);font-weight:600}
+.nav-item .icon{font-size:1rem;width:20px;text-align:center}
+.nav-item .badge{margin-left:auto;background:var(--accent);color:#fff;font-size:.625rem;font-weight:700;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center}
+.sidebar-footer{padding:.5rem;border-top:1px solid var(--border)}
+.sidebar-footer .user{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-radius:var(--radius);font-size:.75rem;color:var(--muted)}
+.sidebar-footer .user .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.625rem;font-weight:700;color:#fff}
+
+.main-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:.625rem 1.5rem;border-bottom:1px solid var(--border);background:rgba(7,7,13,0.8);backdrop-filter:blur(12px);flex-shrink:0}
+.topbar h2{font-size:1rem;font-weight:600}
+.topbar .notif-btn{position:relative;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.25rem;padding:4px}
+.topbar .notif-btn:hover{color:var(--fg)}
+.topbar .notif-btn .badge{position:absolute;top:-2px;right:-4px;background:var(--red);color:#fff;font-size:.5625rem;font-weight:700;padding:1px 5px;border-radius:8px;min-width:16px;text-align:center}
+.content{padding:1.5rem;overflow-y:auto;flex:1}
+
+/* Stats Cards */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-bottom:1.5rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem}
+.stat-card .stat-value{font-size:1.5rem;font-weight:700}
+.stat-card .stat-label{font-size:.75rem;color:var(--muted);margin-top:2px}
+.stat-card .stat-icon{font-size:1.5rem;margin-bottom:.5rem}
+
+/* Tables */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:.8125rem}
+thead{background:rgba(255,255,255,0.02)}
+th{padding:.625rem .75rem;text-align:left;font-weight:600;color:var(--muted);font-size:.6875rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)}
+td{padding:.5rem .75rem;border-bottom:1px solid rgba(255,255,255,0.03)}
+tr:last-child td{border-bottom:none}
+tr:hover{background:rgba(255,255,255,0.02)}
+td .tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.6875rem;font-weight:500}
+.tag-admin{background:rgba(0,136,255,0.1);color:var(--accent)}
+.tag-banned{background:rgba(239,68,68,0.1);color:var(--red)}
+.tag-active{background:rgba(0,200,83,0.1);color:var(--green)}
+.tag-pending{background:rgba(251,191,36,0.1);color:var(--yellow)}
+.action-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:.6875rem;color:var(--muted);cursor:pointer;transition:all .15s;margin:0 2px}
+.action-btn:hover{background:rgba(255,255,255,0.05);color:var(--fg)}
+.action-btn.danger:hover{background:rgba(239,68,68,0.1);color:var(--red);border-color:rgba(239,68,68,0.3)}
+.action-btn.warn:hover{background:rgba(251,191,36,0.1);color:var(--yellow);border-color:rgba(251,191,36,0.3)}
+
+/* Search */
+.search-bar{display:flex;gap:.5rem;margin-bottom:1rem}
+.search-bar input{flex:1;padding:.5rem .75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--fg);font-size:.8125rem;outline:none}
+.search-bar input:focus{border-color:var(--accent)}
+
+/* Config Form */
+.config-form{max-width:600px}
+.config-group{margin-bottom:1rem}
+.config-group label{display:block;font-size:.75rem;font-weight:600;margin-bottom:.375rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.config-group input{width:100%;padding:.5rem .75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--fg);font-size:.8125rem;outline:none}
+.config-group input:focus{border-color:var(--accent)}
+.config-group .btn{padding:.5rem 1rem;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;cursor:pointer}
+.config-group .btn:hover{background:var(--accent2)}
+.config-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
+.config-section h3{font-size:.875rem;font-weight:600;margin-bottom:.75rem}
+
+/* Notifications Panel */
+.notif-panel{position:fixed;top:56px;right:1rem;width:360px;max-height:400px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 8px 32px rgba(0,0,0,0.4);overflow:hidden;z-index:1000;display:none}
+.notif-panel.show{display:block}
+.notif-panel .header{display:flex;justify-content:space-between;align-items:center;padding:.625rem .75rem;border-bottom:1px solid var(--border)}
+.notif-panel .header h3{font-size:.8125rem;font-weight:600}
+.notif-panel .header button{background:none;border:none;color:var(--accent);font-size:.6875rem;cursor:pointer}
+.notif-item{padding:.625rem .75rem;border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer}
+.notif-item:hover{background:rgba(255,255,255,0.02)}
+.notif-item .title{font-size:.8125rem;font-weight:500}
+.notif-item .msg{font-size:.6875rem;color:var(--muted);margin-top:2px}
+.notif-item .time{font-size:.625rem;color:var(--muted);margin-top:2px}
+.notif-item .sev-critical{border-left:3px solid var(--red);padding-left:.5rem}
+.notif-item .sev-warning{border-left:3px solid var(--yellow);padding-left:.5rem}
+.notif-item .sev-info{border-left:3px solid var(--accent);padding-left:.5rem}
+
+/* Mail */
+.mail-list .mail-item{padding:.5rem .75rem;border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.mail-list .mail-item:hover{background:rgba(255,255,255,0.02)}
+.mail-list .mail-item.unread{font-weight:600}
+.mail-list .mail-item .from{font-size:.8125rem}
+.mail-list .mail-item .subject{font-size:.75rem;color:var(--muted)}
+.mail-list .mail-item .date{font-size:.6875rem;color:var(--muted)}
+
+/* User detail panel */
+.detail-panel{position:fixed;right:0;top:0;bottom:0;width:380px;background:var(--surface);border-left:1px solid var(--border);padding:1.25rem;overflow-y:auto;z-index:100;box-shadow:-4px 0 20px rgba(0,0,0,0.3)}
+.detail-panel h3{font-size:.9375rem;font-weight:600;margin-bottom:1rem}
+.detail-panel .field{margin-bottom:.75rem}
+.detail-panel .field label{font-size:.6875rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:2px}
+.detail-panel .field .value{font-size:.8125rem}
+.detail-panel .close{position:absolute;top:.75rem;right:.75rem;background:none;border:none;color:var(--muted);font-size:1.25rem;cursor:pointer}
+
+/* Mobile */
+@media(max-width:768px){
+  .sidebar{width:48px}
+  .sidebar .nav-item span:not(.icon){display:none}
+  .sidebar .nav-item{justify-content:center;padding:.5rem}
+  .sidebar-header .logo{font-size:.875rem}
+  .sidebar-header .sub{display:none}
+  .sidebar .user span{display:none}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .detail-panel{width:100%}
+  .notif-panel{width:calc(100% - 2rem);right:1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen" class="auth-screen">
+  <div class="auth-card">
+    <h1>bap<span>X</span> Admin</h1>
+    <p>Sign in to manage the platform</p>
+    <div class="error" id="login-error"></div>
+    <label>Email</label>
+    <input type="email" id="admin-email" placeholder="admin@bapx.in" value="admin@bapx.in">
+    <label>Password</label>
+    <input type="password" id="admin-password" placeholder="Password">
+    <button class="btn" onclick="adminLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- Admin Layout -->
+<div id="admin-layout" class="admin-layout hidden">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">bap<span>X</span></div>
+      <div class="sub">Admin Panel</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')"><span class="icon">📊</span><span>Dashboard</span></div>
+      <div class="nav-item" data-page="users" onclick="switchPage('users')"><span class="icon">👥</span><span>Users</span></div>
+      <div class="nav-item" data-page="settings" onclick="switchPage('settings')"><span class="icon">⚙️</span><span>Settings</span></div>
+      <div class="nav-item" data-page="notifications" onclick="switchPage('notifications')"><span class="icon">🔔</span><span>Notifications</span><span class="badge" id="notif-count-side">0</span></div>
+      <div class="nav-item" data-page="mail" onclick="switchPage('mail')"><span class="icon">📬</span><span>Mail</span></div>
+      <div class="nav-item" data-page="automation" onclick="switchPage('automation')"><span class="icon">🤖</span><span>Automation</span></div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user">
+        <div class="avatar">A</div>
+        <span id="admin-name">Admin</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="page-title">Dashboard</h2>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span style="font-size:.75rem;color:var(--muted)" id="topbar-time"></span>
+        <button class="notif-btn" onclick="toggleNotifPanel()">
+          🔔<span class="badge" id="notif-count-top">0</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="content" id="page-content"></div>
+  </div>
+</div>
+
+<!-- Notifications Panel -->
+<div class="notif-panel" id="notif-panel">
+  <div class="header">
+    <h3>Notifications</h3>
+    <button onclick="markAllNotifRead()">Mark all read</button>
+  </div>
+  <div id="notif-list" style="max-height:340px;overflow-y:auto"></div>
+</div>
+
+<script>
+const API = '';
+let ADMIN_TOKEN = localStorage.getItem('bapx_admin_token') || '';
+let ADMIN_USER = JSON.parse(localStorage.getItem('bapx_admin_user') || '{}');
+
+function api(method, path, body){
+  var opts = {method: method, headers: {'Content-Type': 'application/json'}};
+  if(ADMIN_TOKEN) opts.headers['Authorization'] = 'Bearer ' + ADMIN_TOKEN;
+  if(body) opts.body = JSON.stringify(body);
+  return fetch(API + path, opts).then(function(r){
+    if(r.status === 403 || r.status === 401){ adminLogout(); throw new Error('Session expired'); }
+    return r.json().catch(function(){ return {} });
+  });
+}
+
+function adminLogin(){
+  var email = document.getElementById('admin-email').value;
+  var pw = document.getElementById('admin-password').value;
+  var errEl = document.getElementById('login-error');
+  api('POST', '/api/admin/login', {email: email, password: pw}).then(function(data){
+    if(data.token){
+      ADMIN_TOKEN = data.token;
+      ADMIN_USER = data.user;
+      localStorage.setItem('bapx_admin_token', ADMIN_TOKEN);
+      localStorage.setItem('bapx_admin_user', JSON.stringify(ADMIN_USER));
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('admin-layout').classList.remove('hidden');
+      loadDashboard();
+      loadNotifCount();
+      updateClock();
+      setInterval(updateClock, 1000);
+      setInterval(loadNotifCount, 30000);
+    } else {
+      errEl.style.display = 'block';
+      errEl.textContent = data.detail || 'Login failed';
+    }
+  }).catch(function(e){
+    errEl.style.display = 'block';
+    errEl.textContent = 'Connection error';
+  });
+}
+
+function adminLogout(){
+  ADMIN_TOKEN = '';
+  ADMIN_USER = {};
+  localStorage.removeItem('bapx_admin_token');
+  localStorage.removeItem('bapx_admin_user');
+  document.getElementById('admin-layout').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+}
+
+function updateClock(){
+  document.getElementById('topbar-time').textContent = new Date().toLocaleString();
+}
+
+function switchPage(page){
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.toggle('active', n.dataset.page === page); });
+  var titles = {dashboard:'Dashboard', users:'Users', settings:'Settings', notifications:'Notifications', mail:'Mail', automation:'Automation'};
+  document.getElementById('page-title').textContent = titles[page] || page;
+  var content = document.getElementById('page-content');
+  if(page === 'dashboard') loadDashboard();
+  else if(page === 'users') loadUsers();
+  else if(page === 'settings') loadSettings();
+  else if(page === 'notifications') loadNotifPage();
+  else if(page === 'mail') loadMail();
+  else if(page === 'automation') loadAutomation();
+}
+
+function loadDashboard(){
+  api('GET', '/api/admin/stats').then(function(d){
+    document.getElementById('page-content').innerHTML =
+      '<div class="stats-grid">' +
+        '<div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">'+d.total_users+'</div><div class="stat-label">Total Users</div></div>' +
+        '<div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value">'+d.active_users+'</div><div class="stat-label">Active</div></div>' +
+        '<div class="stat-card"><div class="stat-icon">🚫</div><div class="stat-value">'+d.banned_users+'</div><div class="stat-label">Banned</div></div>' +
+        '<div class="stat-card"><div class="stat-icon">📝</div><div class="stat-value">'+d.signups_today+'</div><div class="stat-label">Signups Today</div></div>' +
+        '<div class="stat-card"><div class="stat-icon">💬</div><div class="stat-value">'+d.total_sessions+'</div><div class="stat-label">Sessions</div></div>' +
+        '<div class="stat-card"><div class="stat-icon">🔔</div><div class="stat-value">'+d.notifications_unread+'</div><div class="stat-label">Unread Notifications</div></div>' +
+      '</div>' +
+      '<div style="margin-top:1rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">' +
+        '<h3 style="font-size:.875rem;font-weight:600;margin-bottom:.5rem">Welcome to bapX Admin</h3>' +
+        '<p style="font-size:.8125rem;color:var(--muted);line-height:1.6">Manage users, configure billing credentials, view notifications, and run automation tasks.</p>' +
+      '</div>';
+  });
+}
+
+// ── Users ──
+var currentUserSearch = '';
+function loadUsers(search){
+  currentUserSearch = search || '';
+  var url = '/api/admin/users?page=1&limit=50';
+  if(currentUserSearch) url += '&search=' + encodeURIComponent(currentUserSearch);
+  api('GET', url).then(function(d){
+    var html = '<div class="search-bar"><input type="text" placeholder="Search by email or username..." value="' + currentUserSearch + '" onkeyup="if(event.key===\'Enter\')loadUsers(this.value)"/><button class="action-btn" onclick="loadUsers(document.querySelector(\'.search-bar input\').value)">Search</button></div>';
+    html += '<div class="table-wrap"><table><thead><tr><th>Username</th><th>Email</th><th>Provider</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+    (d.users||[]).forEach(function(u){
+      var role = u.is_admin === 1 ? '<span class="tag tag-admin">Admin</span>' : '<span class="tag tag-active">User</span>';
+      var status = u.banned === 1 ? '<span class="tag tag-banned">Banned</span>' : '<span class="tag tag-active">Active</span>';
+      html += '<tr onclick="showUserDetail(\''+u.id+'\')" style="cursor:pointer">' +
+        '<td><strong>'+escapeHtml(u.username)+'</strong></td>' +
+        '<td>'+escapeHtml(u.email)+'</td>' +
+        '<td>'+(u.provider||'none')+'</td>' +
+        '<td>'+role+'</td>' +
+        '<td>'+status+'</td>' +
+        '<td style="font-size:.6875rem">'+(u.created_at||'').slice(0,10)+'</td>' +
+        '<td onclick="event.stopPropagation()">' +
+          (u.banned === 1
+            ? '<button class="action-btn" onclick="adminAction(\'unban\',\''+u.id+'\')">Unban</button>'
+            : '<button class="action-btn warn" onclick="adminAction(\'ban\',\''+u.id+'\')">Ban</button>') +
+          '<button class="action-btn danger" onclick="adminAction(\'delete\',\''+u.id+'\')">Delete</button>' +
+        '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    html += '<div style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">Total: ' + d.total + ' users | Page ' + d.page + ' of ' + d.pages + '</div>';
+    document.getElementById('page-content').innerHTML = html;
+  });
+}
+
+function adminAction(action, userId){
+  var label = {ban:'Ban', unban:'Unban', delete:'Delete'};
+  if(action === 'delete' && !confirm('Delete user ' + userId + '? This cannot be undone.')) return;
+  var method = action === 'delete' ? 'DELETE' : 'POST';
+  var path = '/api/admin/users/' + userId + (action === 'ban' ? '/ban' : action === 'unban' ? '/unban' : '');
+  api(method, path).then(function(d){
+    loadUsers(currentUserSearch);
+  });
+}
+
+function showUserDetail(userId){
+  api('GET', '/api/admin/users/' + userId).then(function(u){
+    var html = '<div class="detail-panel">' +
+      '<button class="close" onclick="this.parentElement.remove()">✕</button>' +
+      '<h3>'+escapeHtml(u.username)+'</h3>' +
+      '<div class="field"><label>User ID</label><div class="value">'+u.id+'</div></div>' +
+      '<div class="field"><label>Email</label><div class="value">'+escapeHtml(u.email)+'</div></div>' +
+      '<div class="field"><label>Name</label><div class="value">'+escapeHtml(u.name||'')+'</div></div>' +
+      '<div class="field"><label>Plan</label><div class="value">'+(u.provider||'None')+'</div></div>' +
+      '<div class="field"><label>Agent</label><div class="value">'+escapeHtml(u.agent_name||'')+'</div></div>' +
+      '<div class="field"><label>Status</label><div class="value">'+(u.banned === 1 ? '🚫 Banned' : '✅ Active')+'</div></div>' +
+      '<div class="field"><label>Created</label><div class="value">'+u.created_at+'</div></div>' +
+      '<div class="field"><label>API Key</label><div class="value">'+(u.api_key||'Not set')+'</div></div>' +
+      '<div style="margin-top:1rem;display:flex;gap:.5rem">' +
+        (u.banned === 1
+          ? '<button class="action-btn" onclick="adminAction(\'unban\',\''+u.id+'\');this.closest(\'.detail-panel\').remove()">Unban</button>'
+          : '<button class="action-btn warn" onclick="adminAction(\'ban\',\''+u.id+'\');this.closest(\'.detail-panel\').remove()">Ban</button>') +
+        '<button class="action-btn danger" onclick="if(confirm(\'Delete?\')){adminAction(\'delete\',\''+u.id+'\');this.closest(\'.detail-panel\').remove()}">Delete</button>' +
+      '</div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+// ── Settings ──
+function loadSettings(){
+  api('GET', '/api/admin/config').then(function(d){
+    var config = d.config || {};
+    var html = '<h3 style="font-size:.875rem;font-weight:600;margin-bottom:1rem">Platform Configuration</h3>';
+    html += '<div class="config-form">';
+
+    // Stripe section
+    html += '<div class="config-section"><h3>💳 Stripe</h3>';
+    html += configGroup('stripe_secret_key', 'Secret Key', config.stripe_secret_key||'');
+    html += configGroup('stripe_webhook_secret', 'Webhook Secret', config.stripe_webhook_secret||'');
+    html += '<button class="btn" onclick="saveConfig(\'stripe_secret_key\')">Save Stripe Key</button></div>';
+
+    // Google OAuth
+    html += '<div class="config-section"><h3>🔑 Google OAuth</h3>';
+    html += configGroup('google_oauth_client_id', 'Client ID', config.google_oauth_client_id||'');
+    html += configGroup('google_oauth_client_secret', 'Client Secret', config.google_oauth_client_secret||'');
+    html += '<button class="btn" onclick="saveConfig(\'google_oauth_client_id\')">Save Google Client ID</button></div>';
+
+    // SMTP
+    html += '<div class="config-section"><h3>📧 SMTP Mail</h3>';
+    html += configGroup('smtp_host', 'Host', config.smtp_host||'');
+    html += configGroup('smtp_port', 'Port', config.smtp_port||'587');
+    html += configGroup('smtp_user', 'Username', config.smtp_user||'');
+    html += configGroup('smtp_pass', 'Password', config.smtp_pass||'');
+    html += configGroup('admin_email', 'Admin Email', config.admin_email||'');
+    html += '<button class="btn" onclick="saveConfig(\'smtp_host\')">Save SMTP Config</button></div>';
+
+    // Billing
+    html += '<div class="config-section"><h3>💰 Billing</h3>';
+    html += configGroup('billing_plan_base_price', 'Base Price ($)', config.billing_plan_base_price||'5');
+    html += configGroup('billing_storage_price_per_gb', 'Storage Price per GB ($)', config.billing_storage_price_per_gb||'1');
+    html += '<button class="btn" onclick="saveConfig(\'billing_plan_base_price\')">Save Billing Config</button></div>';
+
+    html += '</div>';
+    document.getElementById('page-content').innerHTML = html;
+  });
+}
+
+function configGroup(key, label, value){
+  return '<div class="config-group"><label>' + label + '</label><input type="text" id="cfg-' + key + '" value="' + escapeHtml(value) + '" placeholder="' + label + '"></div>';
+}
+
+function saveConfig(key){
+  var input = document.getElementById('cfg-' + key);
+  if(!input) return;
+  api('POST', '/api/admin/config', {key: key, value: input.value}).then(function(d){
+    if(d.status === 'ok') showToast('Saved: ' + key);
+  });
+}
+
+// ── Notifications ──
+function loadNotifCount(){
+  api('GET', '/api/admin/notifications').then(function(d){
+    var unread = (d.notifications||[]).filter(function(n){ return n.read === 0 }).length;
+    document.getElementById('notif-count-side').textContent = unread;
+    document.getElementById('notif-count-top').textContent = unread;
+    renderNotifPanel(d.notifications||[]);
+  });
+}
+
+function renderNotifPanel(notifs){
+  var html = '';
+  notifs.slice(0,10).forEach(function(n){
+    var sevClass = 'sev-' + (n.severity||'info');
+    html += '<div class="notif-item ' + (n.read === 0 ? '' : '') + '" onclick="markNotifRead('+n.id+')">' +
+      '<div class="' + sevClass + '">' +
+      '<div class="title">' + (n.read === 0 ? '🔵 ' : '') + escapeHtml(n.title) + '</div>' +
+      '<div class="msg">' + escapeHtml(n.message) + '</div>' +
+      '<div class="time">' + (n.created_at||'').slice(0,16) + '</div></div></div>';
+  });
+  document.getElementById('notif-list').innerHTML = html || '<div style="padding:1rem;text-align:center;color:var(--muted);font-size:.8125rem">No notifications</div>';
+}
+
+function loadNotifPage(){
+  api('GET', '/api/admin/notifications').then(function(d){
+    var html = '<div class="table-wrap"><table><thead><tr><th>Type</th><th>Title</th><th>Message</th><th>Severity</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
+    (d.notifications||[]).forEach(function(n){
+      var sevColor = n.severity === 'critical' ? 'var(--red)' : n.severity === 'warning' ? 'var(--yellow)' : 'var(--accent)';
+      html += '<tr' + (n.read === 0 ? ' style="font-weight:600"' : '') + '>' +
+        '<td><span style="font-size:.6875rem">'+escapeHtml(n.type)+'</span></td>' +
+        '<td>'+escapeHtml(n.title)+'</td>' +
+        '<td style="font-size:.75rem;color:var(--muted)">'+escapeHtml(n.message)+'</td>' +
+        '<td><span style="color:'+sevColor+'">'+n.severity+'</span></td>' +
+        '<td style="font-size:.6875rem">'+(n.created_at||'').slice(0,10)+'</td>' +
+        '<td>' + (n.read === 0 ? '<button class="action-btn" onclick="markNotifRead('+n.id+')">Mark Read</button>' : '') + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('page-content').innerHTML = html;
+  });
+}
+
+function markNotifRead(id){
+  api('POST', '/api/admin/notifications/' + id + '/read').then(function(){ loadNotifCount(); loadNotifPage(); });
+}
+
+function markAllNotifRead(){
+  api('POST', '/api/admin/notifications/read-all').then(function(){ loadNotifCount(); });
+}
+
+function toggleNotifPanel(){
+  document.getElementById('notif-panel').classList.toggle('show');
+  if(document.getElementById('notif-panel').classList.contains('show')) loadNotifCount();
+}
+
+// ── Mail ──
+function loadMail(){
+  api('GET', '/api/admin/mail').then(function(d){
+    var html = '<div class="mail-list">';
+    (d.mail||[]).forEach(function(m){
+      html += '<div class="mail-item ' + (m.read === 0 ? 'unread' : '') + '" onclick="showMail('+m.id+')">' +
+        '<div><div class="from">' + escapeHtml(m.from_addr) + '</div><div class="subject">' + escapeHtml(m.subject||'(no subject)') + '</div></div>' +
+        '<div class="date">' + (m.received_at||'').slice(0,10) + '</div></div>';
+    });
+    html += (d.mail||[]).length === 0 ? '<div style="padding:1rem;text-align:center;color:var(--muted);font-size:.8125rem">No mail</div>' : '';
+    html += '</div>';
+    document.getElementById('page-content').innerHTML = html;
+  });
+}
+
+function showMail(id){
+  api('GET', '/api/admin/mail/' + id).then(function(m){
+    api('POST', '/api/admin/mail/' + id + '/read').then(function(){});
+    var html = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem">' +
+      '<button class="action-btn" onclick="loadMail()" style="margin-bottom:1rem">← Back</button>' +
+      '<h3 style="font-size:1rem;font-weight:600;margin-bottom:.5rem">' + escapeHtml(m.subject||'(no subject)') + '</h3>' +
+      '<div style="font-size:.75rem;color:var(--muted);margin-bottom:1rem">From: ' + escapeHtml(m.from_addr) + ' | ' + (m.received_at||'') + '</div>' +
+      '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-size:.8125rem;line-height:1.6;white-space:pre-wrap">' + escapeHtml(m.body||'') + '</div>' +
+      '<button class="action-btn danger" onclick="if(confirm(\'Delete?\')){api(\'DELETE\',\'/api/admin/mail/'+id+'\').then(function(){loadMail();})}" style="margin-top:1rem">Delete</button></div>';
+    document.getElementById('page-content').innerHTML = html;
+  });
+}
+
+// ── Automation ──
+function loadAutomation(){
+  api('GET', '/api/admin/automation/logs').then(function(d){
+    var html = '<h3 style="font-size:.875rem;font-weight:600;margin-bottom:.75rem">Automation Controls</h3>' +
+      '<div style="display:flex;gap:.5rem;margin-bottom:1.5rem">' +
+        '<button class="action-btn warn" onclick="runAutomation(\'cleanup-banned\')">🧹 Cleanup Banned Users</button>' +
+        '<button class="action-btn" onclick="runAutomation(\'clear-cache\')">🗑️ Clear Cache</button>' +
+      '</div>' +
+      '<div id="automation-result"></div>' +
+      '<h4 style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em">Logs</h4>' +
+      '<div class="table-wrap"><table><thead><tr><th>Action</th><th>Status</th><th>Details</th><th>Date</th></tr></thead><tbody>';
+    (d.logs||[]).forEach(function(l){
+      html += '<tr><td>' + escapeHtml(l.action) + '</td><td><span class="tag tag-active">'+l.status+'</span></td><td style="font-size:.75rem;color:var(--muted)">' + escapeHtml(l.details||'') + '</td><td style="font-size:.6875rem">'+(l.created_at||'').slice(0,16)+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('page-content').innerHTML = html;
+  });
+}
+
+function runAutomation(action){
+  api('POST', '/api/admin/automation/' + action).then(function(d){
+    document.getElementById('automation-result').innerHTML =
+      '<div style="background:rgba(0,200,83,0.1);color:var(--green);padding:.5rem .75rem;border-radius:var(--radius);font-size:.8125rem;margin-bottom:1rem">' +
+      'Completed: ' + (d.message || (d.cleaned !== undefined ? 'Cleaned ' + d.cleaned + ' users' : 'Done')) + '</div>';
+    loadAutomation();
+  });
+}
+
+// ── Helpers ──
+function escapeHtml(s){
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg){
+  var el = document.createElement('div');
+  el.style.cssText = 'position:fixed;bottom:1rem;right:1rem;background:rgba(0,200,83,0.9);color:#fff;padding:.5rem 1rem;border-radius:8px;font-size:.8125rem;z-index:9999';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function(){ el.remove(); }, 2000);
+}
+
+// ── Check login on load ──
+if(ADMIN_TOKEN){
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('admin-layout').classList.remove('hidden');
+  loadDashboard();
+  loadNotifCount();
+  updateClock();
+  setInterval(updateClock, 1000);
+  setInterval(loadNotifCount, 30000);
+}
+</script>
+</body>
+</html>
