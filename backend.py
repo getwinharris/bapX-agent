@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
-from passlib.hash import bcrypt
+import hashlib, secrets
 import jwt
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -31,55 +31,15 @@ DATA_DIR = Path(os.environ.get("BAPX_DATA_DIR", str(BASE_DIR / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── DB ──
-conn = sqlite3.connect(str(DATA_DIR / "bapx.db"), check_same_thread=False)
+conn = sqlite3.connect(str(DATA_DIR / "bapx.db"), check_same_thread=False, timeout=10)
 conn.row_factory = sqlite3.Row
 conn.execute("PRAGMA journal_mode=WAL")
+conn.execute("PRAGMA busy_timeout=5000")
 conn.execute("PRAGMA foreign_keys=ON")
 
-conn.executescript("""
-CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL DEFAULT '',
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    age TEXT DEFAULT '',
-    nature TEXT DEFAULT '',
-    agent_name TEXT DEFAULT 'BapX',
-    bio TEXT DEFAULT '',
-    soul_md TEXT DEFAULT '',
-    -- API Key auth
-    api_key TEXT DEFAULT '',
-    provider TEXT DEFAULT 'openai',
-    model TEXT DEFAULT '',
-    -- OAuth auth (device flow tokens)
-    oauth_tokens TEXT DEFAULT '{}',
-    -- Skills: stored as comma-separated skill names
-    skills_enabled TEXT DEFAULT '[]',
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-);
-CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    title TEXT DEFAULT 'New Chat',
-    messages TEXT DEFAULT '[]',
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-CREATE TABLE IF NOT EXISTS oauth_flows (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    provider TEXT NOT NULL,
-    device_code TEXT NOT NULL,
-    user_code TEXT NOT NULL,
-    verification_uri TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
-    expires_at TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-""")
+conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL DEFAULT '', email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, age TEXT DEFAULT '', nature TEXT DEFAULT '', agent_name TEXT DEFAULT 'BapX', bio TEXT DEFAULT '', soul_md TEXT DEFAULT '', api_key TEXT DEFAULT '', provider TEXT DEFAULT 'openai', model TEXT DEFAULT '', oauth_tokens TEXT DEFAULT '{}', skills_enabled TEXT DEFAULT '[]', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))")
+conn.execute("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT DEFAULT 'New Chat', messages TEXT DEFAULT '[]', created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
+conn.execute("CREATE TABLE IF NOT EXISTS oauth_flows (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL, device_code TEXT NOT NULL, user_code TEXT NOT NULL, verification_uri TEXT NOT NULL, status TEXT DEFAULT 'pending', expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
 conn.commit()
 
 # ── FastAPI App ──
@@ -299,7 +259,7 @@ Your agent works for you autonomously — executing tasks, managing memory, buil
         (id, username, name, email, password_hash, age, nature, agent_name, bio, soul_md)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (uid, req.username, req.name, req.email,
-         bcrypt.hash(req.password), req.age, req.nature,
+         hashlib.sha256(req.password.encode()).hexdigest(), req.age, req.nature,
          agent_name, req.bio, soul))
     conn.commit()
     return {"token": make_token(uid), "user": {
@@ -311,7 +271,7 @@ Your agent works for you autonomously — executing tasks, managing memory, buil
 @limiter.limit("20/minute")
 def login(req: LoginReq, request: Request):
     user = conn.execute("SELECT * FROM users WHERE email = ?", (req.email,)).fetchone()
-    if not user or not bcrypt.verify(req.password, user["password_hash"]):
+    if not user or not hashlib.sha256(req.password.encode()).hexdigest() == user["password_hash"]:
         raise HTTPException(401, "Invalid credentials")
     return {"token": make_token(user["id"]), "user": dict(user)}
 
