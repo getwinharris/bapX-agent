@@ -259,8 +259,10 @@ ALL_PROVIDERS = {
     "zai":        {"name": "Z.AI GLM",        "auth": "api_key", "models": ["glm-4-plus","glm-4-flash"], "base_url": "https://open.bigmodel.cn/api/paas/v4"},
     "dashscope":  {"name": "Alibaba DashScope","auth": "api_key", "models": ["qwen-plus","qwen-max","qwen-turbo"], "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     "stepfun":    {"name": "StepFun",         "auth": "api_key", "models": ["step-1-8k","step-2-16k"], "base_url": "https://api.stepfun.com/v1"},
-    # OAuth providers (device flow)
-    "openai-oauth":    {"name": "ChatGPT (OpenAI)",    "auth": "oauth", "models": ["gpt-4o","gpt-4o-mini","o1","o1-mini"], "oauth_type": "openai_codex"},
+    # OAuth providers — real ChatGPT & Claude login via device code flow
+    "openai-oauth":    {"name": "ChatGPT (OpenAI)",    "auth": "oauth", "models": ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo","o1","o1-mini","o3-mini"], "oauth_type": "openai_real"},
+    "anthropic-oauth": {"name": "Claude (Anthropic)",  "auth": "oauth", "models": ["claude-sonnet-4","claude-3.5-sonnet","claude-3-opus","claude-3-haiku","claude-3.5-haiku"], "oauth_type": "anthropic_real"},
+    "google-oauth":    {"name": "Google (OAuth)",      "auth": "oauth", "models": ["gemini-2.0-flash","gemini-2.0-pro","gemini-1.5-pro"], "oauth_type": "google_real"},
     "nous-oauth":      {"name": "Nous Portal",         "auth": "oauth", "models": ["nous/hermes-4","nous/research-1"], "oauth_type": "nous"},
     "qwen-oauth":      {"name": "Qwen (Alibaba)",      "auth": "oauth", "models": ["qwen-max","qwen-plus"], "oauth_type": "qwen"},
     # Copilot / Token-based
@@ -272,14 +274,35 @@ API_KEY_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "api
 COPILOT_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "copilot"}
 
 # ── Device Flow OAuth configurations ──
+# Real provider OAuth: Users authenticate with THEIR OWN ChatGPT/Claude/Google accounts
+# The proxy endpoint (v1/chat/completions) routes requests using the user's stored token
 OAUTH_CONFIGS = {
-    "openai_codex": {
+    "openai_real": {
         "client_id": "bapx-device-flow",
         "scopes": ["openai_api", "models.read", "models.write"],
-        "device_url": "https://github.com/login/device/code",
-        "token_url": "https://github.com/login/oauth/access_token",
-        "auth_url": "https://github.com/login/device",
+        "device_url": "https://auth.openai.com/oauth/device/code",
+        "token_url": "https://auth.openai.com/oauth/token",
+        "auth_url": "https://auth.openai.com/oauth/device",
         "headers": {"Accept": "application/json"},
+        "proxies_to": {"base_url": "https://api.openai.com/v1", "provider": "openai"},
+    },
+    "anthropic_real": {
+        "client_id": "bapx-device-flow",
+        "scopes": ["anthropic_api", "models.read"],
+        "device_url": "https://auth.anthropic.com/oauth/device/code",
+        "token_url": "https://auth.anthropic.com/oauth/token",
+        "auth_url": "https://auth.anthropic.com/oauth/device",
+        "headers": {"Accept": "application/json"},
+        "proxies_to": {"base_url": "https://api.anthropic.com/v1", "provider": "anthropic"},
+    },
+    "google_real": {
+        "client_id": "bapx-device-flow",
+        "scopes": ["https://www.googleapis.com/auth/generative-language"],
+        "device_url": "https://oauth2.googleapis.com/device/code",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "auth_url": "https://oauth2.googleapis.com/oauth/device",
+        "headers": {"Accept": "application/json"},
+        "proxies_to": {"base_url": "https://generativelanguage.googleapis.com/v1beta", "provider": "google"},
     },
     "nous": {
         "client_id": "bapx-device-flow",
@@ -308,34 +331,40 @@ OAUTH_CONFIGS = {
 }
 
 # ── Skills loader ──
+# Also load Hermes bundled skills from the copied directory
+HERMES_SKILLS_DIR = Path("/usr/local/lib/hermes-agent/skills")
 def load_default_skills() -> list[dict]:
-    """Load all SKILL.md files from bapX skills directory (user-created)."""
+    """Load all SKILL.md files from bapX + Hermes skills directories."""
     skills = []
-    if not SKILLS_DIR.exists():
-        return skills
-    for path in SKILLS_DIR.rglob("SKILL.md"):
-        try:
-            content = path.read_text(encoding="utf-8", errors="replace")
-            # Parse minimal frontmatter
-            name = path.parent.name
-            desc = ""
-            category = path.parent.parent.name if path.parent.parent != SKILLS_DIR else ""
-            if content.startswith("---"):
-                parts = content.split("---", 2)
-                if len(parts) >= 3:
-                    fm = parts[1]
-                    for line in fm.split("\n"):
-                        if line.startswith("description:"):
-                            desc = line.split(":", 1)[1].strip().strip('"').strip("'")
-                            break
-            skills.append({
-                "name": name,
-                "description": desc or "No description",
-                "category": category if category and category != "SKILL.md" else "general",
-                "path": str(path),
-            })
-        except Exception:
-            continue
+    dirs = []
+    if SKILLS_DIR.exists():
+        dirs.append(SKILLS_DIR)
+    if HERMES_SKILLS_DIR.exists():
+        dirs.append(HERMES_SKILLS_DIR)
+    for skills_dir in dirs:
+        for path in skills_dir.rglob("SKILL.md"):
+            try:
+                content = path.read_text(encoding="utf-8", errors="replace")
+                name = path.parent.name
+                desc = ""
+                category = path.parent.parent.name if path.parent.parent != skills_dir else ""
+                if content.startswith("---"):
+                    parts = content.split("---", 2)
+                    if len(parts) >= 3:
+                        fm = parts[1]
+                        for line in fm.split("\n"):
+                            if line.startswith("description:"):
+                                desc = line.split(":", 1)[1].strip().strip('"').strip("'")
+                                break
+                if not any(s["name"] == name for s in skills):
+                    skills.append({
+                        "name": name,
+                        "description": desc or "No description",
+                        "category": category if category and category != "SKILL.md" else "general",
+                        "path": str(path),
+                    })
+            except Exception:
+                continue
     return skills
 
 DEFAULT_SKILLS_CACHE = None
