@@ -261,31 +261,35 @@ a{color:var(--accent);text-decoration:none}
 .slash-item:hover{background:rgba(139,92,246,0.1);color:var(--accent)}
 .slash-no-match{padding:.5rem .75rem;font-size:.6875rem;color:var(--muted);text-align:center}
 
-/* RESPONSIVE — always show 48px icon rail on mobile */
+/* RESPONSIVE — always show 48px icon rail on mobile, EXPAND ONLY ON DEMAND */
 @media(max-width:768px){
-  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:100;width:48px!important;transform:none!important}
-  .sidebar .nav-label,.sidebar .sidebar-logo-text,.sidebar .user-name{opacity:0!important;width:0!important;overflow:hidden}
-  .sidebar.expanded{width:240px!important;transform:none!important;box-shadow:4px 0 20px rgba(0,0,0,0.5)}
-  .sidebar.expanded .nav-label,.sidebar.expanded .sidebar-logo-text,.sidebar.expanded .user-name{opacity:1!important;width:auto!important}
-  .sidebar-logo-text{opacity:0!important;width:0!important;overflow:hidden}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:100;width:48px!important}
+  .sidebar .nav-label,.sidebar .sidebar-logo-text,.sidebar .user-name{opacity:0!important;width:0!important;overflow:hidden;display:none}
+  .sidebar.expanded{width:240px!important;box-shadow:4px 0 30px rgba(0,0,0,0.6);z-index:101}
+  .sidebar.expanded .nav-label,.sidebar.expanded .sidebar-logo-text,.sidebar.expanded .user-name{opacity:1!important;width:auto!important;display:inline!important}
+  .sidebar-logo-text{opacity:0!important;width:0!important;overflow:hidden;display:none}
   .sidebar-logo{justify-content:center}
   .sidebar.expanded .sidebar-logo{justify-content:flex-start}
   .sidebar-nav{padding:.25rem .35rem}
-  .nav-item{justify-content:center;padding:.625rem .35rem}
+  .nav-item{justify-content:center;padding:.625rem .35rem;min-width:36px}
   .sidebar.expanded .nav-item{justify-content:flex-start;padding:.625rem .75rem}
   .sidebar-user{justify-content:center;padding:.75rem .5rem}
   .sidebar.expanded .sidebar-user{justify-content:flex-start;padding:.75rem 1rem}
-  .main-content{margin-left:48px} /* Content offset for fixed sidebar rail */
+  .main-content{margin-left:48px}
   .backdrop.show{display:block!important}
   .hamburger{display:none!important}
-  .right-panel.open{position:fixed;right:0;top:0;bottom:0;width:300px!important;z-index:100;box-shadow:-4px 0 20px rgba(0,0,0,0.5)}
-  .chat-msg{max-width:90%}
-  .view-body{padding:1rem}
+  .right-panel.open{position:fixed;right:0;top:0;bottom:0;width:300px!important;z-index:101;box-shadow:-4px 0 20px rgba(0,0,0,0.5)}
+  .chat-msg{max-width:92%}
+  .view-body{padding:.75rem}
   .skills-grid{grid-template-columns:1fr}
   .oauth-grid{grid-template-columns:1fr 1fr}
   .prov-form{grid-template-columns:1fr}
   .auth-card{padding:1.5rem}
-  .settings-tabs{padding:0 1rem}
+  .settings-tabs{padding:0 .75rem;overflow-x:auto}
+  .settings-section{padding:1rem}
+  .chat-header{padding:.6rem .75rem}
+  .chat-input-area{padding:.6rem .75rem}
+  .chat-messages{padding:.75rem}
 }
 @media(min-width:769px){
   .sidebar{width:48px}

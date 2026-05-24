@@ -13,7 +13,7 @@ Build the complete bapX agent platform dashboard — pure HTML/CSS/JS, single-pa
 - [x] Session management
 - [x] Health endpoint
 
-### 2. Frontend — Build this with Codex CLI
+### 2. Frontend — Build this with bapX
 The main deliverable. A single `/root/Dev/bapx/static/dashboard.html` file containing:
 
 #### Layout

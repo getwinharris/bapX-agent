@@ -1,0 +1,698 @@
+{
+  "creative": [
+    {
+      "name": "architecture-diagram",
+      "title": "Architecture Diagram",
+      "description": "Generate dark-themed SVG architecture/cloud/infrastructure diagrams as HTML.",
+      "tags": ["diagram", "svg", "architecture", "infrastructure", "visualization"],
+      "about": "Create professional dark-mode architecture diagrams rendered as inline SVG in HTML. Supports cloud providers, system components, and network flows with a clean aesthetic.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "ascii-art",
+      "title": "ASCII Art",
+      "description": "Generate ASCII art from text descriptions or images.",
+      "tags": ["art", "ascii", "creative", "text-art"],
+      "about": "Transform text prompts into ASCII art masterpieces in various styles including detailed scenes, logos, and character art rendered entirely in characters.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "ascii-video",
+      "title": "ASCII Video",
+      "description": "Generate animated ASCII art videos that play in the terminal.",
+      "tags": ["art", "ascii", "video", "animation", "terminal"],
+      "about": "Create animated sequences that play as ASCII art directly in the terminal. Great for demos, visualizations, and retro-style creative projects.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "baoyu-comic",
+      "title": "Baoyu Comic",
+      "description": "Generate comic strips and manga-style panel layouts with AI artwork.",
+      "tags": ["comic", "manga", "art", "storytelling", "illustration"],
+      "about": "Create multi-panel comic strips with AI-generated artwork and narrative flow. Supports various styles from western comics to manga with speech bubbles and panel layouts.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "baoyu-infographic",
+      "title": "Baoyu Infographic",
+      "description": "Generate data-driven infographics and visual explainers.",
+      "tags": ["infographic", "visualization", "data", "design", "presentation"],
+      "about": "Transform data and concepts into polished infographics with charts, icons, and structured layouts. Ideal for reports, presentations, and social media content.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "baoyu-article-illustrator",
+      "title": "Baoyu Article Illustrator",
+      "description": "Illustrate articles with type x style x palette consistent imagery.",
+      "tags": ["article", "illustration", "creative", "image-generation", "writing"],
+      "about": "Analyze articles, identify key illustration points, and generate consistent imagery across three dimensions of type, style, and color palette.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "claude-design",
+      "title": "Claude Design",
+      "description": "Generate HTML/CSS UI mockups and design prototypes.",
+      "tags": ["design", "ui", "html", "css", "prototype"],
+      "about": "Create interactive UI mockups and design prototypes as standalone HTML/CSS files. Useful for rapid iteration on web interfaces before committing to production code.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "comfyui",
+      "title": "ComfyUI",
+      "description": "Generate images, video, and audio with ComfyUI workflows.",
+      "tags": ["comfyui", "image-generation", "stable-diffusion", "flux", "video-generation"],
+      "about": "Full ComfyUI lifecycle management including installation, node/model management, workflow execution with parameter injection, and batch processing for image/video/audio generation.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "design-md",
+      "title": "DESIGN.md",
+      "description": "Author, validate, and export Google DESIGN.md design token spec files.",
+      "tags": ["design", "design-system", "tokens", "ui", "tailwind"],
+      "about": "Create and manage DESIGN.md files following Google's open spec for design tokens with machine-readable YAML frontmatter and human-readable markdown rationale.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "excalidraw",
+      "title": "Excalidraw",
+      "description": "Generate Excalidraw-compatible hand-drawn style diagrams.",
+      "tags": ["diagram", "excalidraw", "drawing", "whiteboard", "visualization"],
+      "about": "Create hand-drawn style diagrams compatible with Excalidraw format. Perfect for flowcharts, wireframes, and collaborative whiteboard-style illustrations.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "humanizer",
+      "title": "Humanizer",
+      "description": "Rewrite AI-generated text to sound more natural and human.",
+      "tags": ["writing", "text", "polish", "editing", "natural-language"],
+      "about": "Takes AI-generated text and rewrites it to reduce robotic patterns and improve natural flow. Adjusts tone, sentence variety, and phrasing for authentic human-like writing.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "ideation",
+      "title": "Ideation",
+      "description": "Brainstorm and develop creative ideas with structured thinking.",
+      "tags": ["brainstorming", "creativity", "ideation", "thinking", "planning"],
+      "about": "Facilitates structured brainstorming sessions to generate, refine, and evaluate creative ideas. Supports divergent thinking, lateral connections, and concept development.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "manim-video",
+      "title": "Manim Video",
+      "description": "Generate mathematical animations using the Manim library.",
+      "tags": ["animation", "math", "video", "manim", "education"],
+      "about": "Create beautiful mathematical animations in the style of 3Blue1Brown using the Manim library. Ideal for educational content, math visualization, and explainer videos.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "meme-generation",
+      "title": "Meme Generation",
+      "description": "Generate custom memes with text overlays and templates.",
+      "tags": ["meme", "fun", "image", "template", "social-media"],
+      "about": "Create custom memes by applying text overlays to popular meme templates or user-provided images. Supports classic formats and custom caption positioning.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "p5js",
+      "title": "p5.js",
+      "description": "Generate interactive p5.js sketches and creative coding projects.",
+      "tags": ["creative-coding", "p5js", "javascript", "interactive", "generative"],
+      "about": "Create generative art, interactive visualizations, and creative coding projects using the p5.js library. Outputs runnable HTML with embedded JavaScript sketches.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "pixel-art",
+      "title": "Pixel Art",
+      "description": "Generate pixel art sprites, icons, and scenes.",
+      "tags": ["pixel-art", "sprite", "retro", "art", "game-asset"],
+      "about": "Create retro-style pixel art including character sprites, icons, tilesets, and full scenes. Choose from various color palettes and resolutions for game development or nostalgia.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "popular-web-designs",
+      "title": "Popular Web Designs",
+      "description": "Generate trendy modern web design layouts and UI components.",
+      "tags": ["web-design", "ui", "trendy", "layout", "html-css"],
+      "about": "Stay on-trend with modern web design patterns including glassmorphism, neumorphism, brutalist, and minimalist layouts. Generates ready-to-use HTML/CSS snippets.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "sketch",
+      "title": "Sketch",
+      "description": "Generate SVG sketches, illustrations, and vector art.",
+      "tags": ["sketch", "svg", "vector", "illustration", "art"],
+      "about": "Create vector illustrations and sketches as standalone SVG files. Supports line art, filled illustrations, icons, and complex vector compositions.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "songwriting-and-ai-music",
+      "title": "Songwriting & AI Music",
+      "description": "Generate song lyrics, chord progressions, and music concepts.",
+      "tags": ["music", "songwriting", "lyrics", "creative", "audio"],
+      "about": "Assist with songwriting including lyrics, chord progressions, melody suggestions, and full song structures. Can generate lead sheets and music production concepts.",
+      "enabled_by_default": true
+    }
+  ],
+  "software-development": [
+    {
+      "name": "code-review",
+      "title": "Code Review",
+      "description": "Automated code review with detailed analysis and improvement suggestions.",
+      "tags": ["code-review", "quality", "best-practices", "analysis"],
+      "about": "Performs thorough automated code review identifying bugs, security issues, performance bottlenecks, and style inconsistencies. Provides actionable improvement suggestions.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "debugging",
+      "title": "Debugging",
+      "description": "Interactive debugging assistant for diagnosing and fixing software issues.",
+      "tags": ["debugging", "troubleshooting", "fixes", "errors"],
+      "about": "Helps diagnose and fix software bugs through systematic analysis of error messages, stack traces, and code context. Works across languages and frameworks.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "plan",
+      "title": "Plan",
+      "description": "Generate structured implementation plans from high-level requirements.",
+      "tags": ["planning", "architecture", "implementation", "design"],
+      "about": "Breaks down complex development tasks into actionable implementation plans with phases, milestones, and dependencies. Creates clear roadmaps from ambiguous requirements.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "spike",
+      "title": "Spike",
+      "description": "Quick exploratory research and prototyping for technical unknowns.",
+      "tags": ["research", "prototyping", "exploration", "technical"],
+      "about": "Conducts time-boxed technical investigations to reduce uncertainty. Tests assumptions, explores API surfaces, and produces proof-of-concept code for unknown domains.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "tdd",
+      "title": "Test-Driven Development",
+      "description": "Write tests first, then implement code to pass them iteratively.",
+      "tags": ["tdd", "testing", "quality", "best-practices"],
+      "about": "Guides test-driven development workflows: write failing tests first, implement minimal code to pass, then refactor. Supports popular testing frameworks across languages.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "writing-plans",
+      "title": "Writing Plans",
+      "description": "Generate detailed software design documents and technical specs.",
+      "tags": ["documentation", "planning", "specs", "design-docs"],
+      "about": "Creates comprehensive software design documents including architecture decisions, API contracts, data models, and implementation notes. Bridges the gap between ideas and code.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "systematic-debugging",
+      "title": "Systematic Debugging",
+      "description": "Methodical root-cause analysis using scientific debugging methods.",
+      "tags": ["debugging", "root-cause", "analysis", "methodical"],
+      "about": "Applies the scientific method to debugging: form hypotheses, design experiments, gather evidence, and isolate root causes. Eliminates guesswork from complex bug investigations.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "node-inspect-debugger",
+      "title": "Node.js Inspector Debugger",
+      "description": "Debug Node.js applications using the built-in inspector protocol.",
+      "tags": ["nodejs", "debugging", "inspector", "javascript"],
+      "about": "Leverages Node.js inspector protocol for step-through debugging, breakpoints, heap snapshots, and CPU profiling of JavaScript and TypeScript applications.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "python-debugpy",
+      "title": "Python Debugger (debugpy)",
+      "description": "Debug Python applications using the debugpy adapter protocol.",
+      "tags": ["python", "debugging", "debugpy", "ptvsd"],
+      "about": "Uses the debugpy protocol for full-featured Python debugging including breakpoints, variable inspection, call stack navigation, and remote debugging sessions.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "manual-code-review",
+      "title": "Manual Code Review",
+      "description": "Human-style line-by-line code review with nuanced feedback.",
+      "tags": ["code-review", "manual", "quality", "peer-review"],
+      "about": "Performs detailed human-quality code review with nuanced feedback on design patterns, edge cases, readability, and maintainability. Mimics expert peer review sessions.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "subagent-driven-development",
+      "title": "Subagent-Driven Development",
+      "description": "Orchestrate multiple AI subagents for complex development tasks.",
+      "tags": ["multi-agent", "orchestration", "development", "delegation"],
+      "about": "Decomposes large development tasks across specialized AI subagents that work in parallel or sequence. Each subagent focuses on its strength for maximum efficiency.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "hermes-agent-skill-authoring",
+      "title": "Skill Authoring",
+      "description": "Author SKILL.md files for Hermes Agent with proper frontmatter and structure.",
+      "tags": ["skills", "authoring", "hermes-agent", "conventions"],
+      "about": "Guide for authoring in-repo SKILL.md files with proper YAML frontmatter, description limits, directory placement, and peer-matched structure conventions.",
+      "enabled_by_default": true
+    }
+  ],
+  "devops": [
+    {
+      "name": "webhook-subscriptions",
+      "title": "Webhook Subscriptions",
+      "description": "Receive and respond to webhook events from external services.",
+      "tags": ["webhook", "events", "integration", "automation"],
+      "about": "Register webhook endpoints and process incoming events from GitHub, Stripe, Slack, and other services. Enables event-driven automation workflows and integrations.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "kanban-orchestrator",
+      "title": "Kanban Orchestrator",
+      "description": "Orchestrate multi-step workflows using a kanban task board.",
+      "tags": ["kanban", "orchestration", "workflow", "automation", "tasks"],
+      "about": "Manages complex multi-step workflows via a virtual kanban board. Tracks task states, assigns work, and progresses items through defined pipeline stages.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "kanban-worker",
+      "title": "Kanban Worker",
+      "description": "Execute tasks assigned by the kanban orchestrator.",
+      "tags": ["kanban", "worker", "tasks", "execution"],
+      "about": "Worker agent that executes tasks assigned through the kanban orchestration system. Processes work items and reports completion status back to the board.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "docker-management",
+      "title": "Docker Management",
+      "description": "Manage Docker containers, images, volumes, and compose stacks.",
+      "tags": ["docker", "containers", "devops", "deployment"],
+      "about": "Full Docker lifecycle management including container creation, image builds, volume management, compose orchestration, and container health monitoring.",
+      "enabled_by_default": true
+    }
+  ],
+  "data-science": [
+    {
+      "name": "jupyter-live-kernel",
+      "title": "Jupyter Live Kernel",
+      "description": "Execute Python code in a live Jupyter kernel for data analysis.",
+      "tags": ["jupyter", "python", "data-science", "notebook", "analysis"],
+      "about": "Connects to a live Jupyter kernel for interactive Python execution with state retention across cells. Ideal for data exploration, visualization, and statistical analysis.",
+      "enabled_by_default": true
+    }
+  ],
+  "email": [
+    {
+      "name": "himalaya",
+      "title": "Himalaya Email",
+      "description": "Read, send, and manage email via IMAP/SMTP using Himalaya CLI.",
+      "tags": ["email", "imap", "smtp", "communication", "himalaya"],
+      "about": "Full email management through the Himalaya CLI tool supporting IMAP and SMTP protocols. Browse inboxes, send messages, manage folders, and handle attachments programmatically.",
+      "enabled_by_default": true
+    }
+  ],
+  "github": [
+    {
+      "name": "github-auth",
+      "title": "GitHub Auth",
+      "description": "Authenticate with GitHub for API access and repository operations.",
+      "tags": ["github", "auth", "authentication", "git"],
+      "about": "Handles GitHub authentication via tokens or OAuth for secure API access. Provides authenticated access to all GitHub operations including repos, issues, PRs, and code review.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "github-code-review",
+      "title": "GitHub Code Review",
+      "description": "Review pull requests on GitHub with automated analysis inline.",
+      "tags": ["github", "code-review", "pull-requests", "quality"],
+      "about": "Automated pull request review integrated with GitHub that posts inline comments on diffs, suggests improvements, and approves or requests changes on PRs.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "github-issues",
+      "title": "GitHub Issues",
+      "description": "Create, read, update, and manage GitHub issues.",
+      "tags": ["github", "issues", "tracking", "project-management"],
+      "about": "Full GitHub issues management including creating, assigning, labeling, commenting on, and closing issues. Integrates with project boards and milestones.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "github-pr-workflow",
+      "title": "GitHub PR Workflow",
+      "description": "Manage pull request lifecycle from creation through merge.",
+      "tags": ["github", "pull-requests", "workflow", "merge"],
+      "about": "End-to-end pull request management including creation, review request assignment, status checks, merge conflict resolution, and merge strategy selection.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "github-repo-management",
+      "title": "GitHub Repo Management",
+      "description": "Create, configure, and manage GitHub repositories.",
+      "tags": ["github", "repositories", "management", "git"],
+      "about": "Full repository lifecycle management including creation, fork, branch protection rules, webhook configuration, secret management, and collaborator permissions.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "codebase-inspection",
+      "title": "Codebase Inspection",
+      "description": "Deep analysis of GitHub repository codebases and project structure.",
+      "tags": ["github", "codebase", "analysis", "inspection", "audit"],
+      "about": "Performs comprehensive analysis of GitHub repository codebases including dependency graphs, code quality metrics, architecture mapping, and security vulnerability scanning.",
+      "enabled_by_default": true
+    }
+  ],
+  "mcp": [
+    {
+      "name": "native-mcp",
+      "title": "Native MCP",
+      "description": "Model Context Protocol integration for external tool connectivity.",
+      "tags": ["mcp", "protocol", "integration", "tools", "context"],
+      "about": "Implements the Model Context Protocol for connecting to external MCP servers and tools. Enables seamless integration with the broader MCP ecosystem of services and APIs.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "fastmcp",
+      "title": "FastMCP",
+      "description": "Scaffold and deploy FastMCP servers for custom tool integrations.",
+      "tags": ["mcp", "fastmcp", "server", "scaffolding", "python"],
+      "about": "Scaffold, build, and deploy FastMCP servers for creating custom MCP tool integrations. Provides templates and utilities for API wrappers, database servers, and file processors.",
+      "enabled_by_default": true
+    }
+  ],
+  "media": [
+    {
+      "name": "gif-search",
+      "title": "GIF Search",
+      "description": "Search and retrieve GIFs from Tenor or GIPHY databases.",
+      "tags": ["gif", "search", "media", "tenor", "giphy"],
+      "about": "Search popular GIF databases for the perfect reaction, meme, or illustration. Returns GIF URLs and previews for use in messages, conversations, and content.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "heartmula",
+      "title": "Heartmula",
+      "description": "Send animated heart messages and love-themed media.",
+      "tags": ["love", "hearts", "animation", "fun", "messages"],
+      "about": "Generate and send animated heart messages, love letters, and romantic content. Perfect for expressing affection through creative animated media and messages.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "songsee",
+      "title": "Songsee",
+      "description": "Identify songs and find music recommendations.",
+      "tags": ["music", "identification", "recommendations", "audio"],
+      "about": "Helps identify songs from descriptions, lyrics fragments, or audio features. Provides music recommendations and links to streaming platforms for discovery.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "spotify",
+      "title": "Spotify",
+      "description": "Control Spotify playback, manage playlists, and search music.",
+      "tags": ["spotify", "music", "playlist", "streaming", "audio"],
+      "about": "Full Spotify integration for searching tracks, managing playlists, controlling playback, and discovering new music. Connects to Spotify Web API for account features.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "youtube-content",
+      "title": "YouTube Content",
+      "description": "Search YouTube, fetch video metadata, and retrieve transcripts.",
+      "tags": ["youtube", "video", "search", "content", "media"],
+      "about": "Search YouTube videos, fetch metadata including views, duration, and description, and retrieve video transcripts. Useful for content research and media analysis.",
+      "enabled_by_default": true
+    }
+  ],
+  "mlops": [
+    {
+      "name": "huggingface-hub",
+      "title": "Hugging Face Hub",
+      "description": "Download, upload, and manage models and datasets on Hugging Face.",
+      "tags": ["huggingface", "models", "datasets", "ml", "hub"],
+      "about": "Interact with the Hugging Face Hub to browse, download, and upload models, datasets, and Spaces. Supports model discovery and version management for ML workflows.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "llama-cpp",
+      "title": "llama.cpp",
+      "description": "Run quantized LLMs locally using the llama.cpp inference engine.",
+      "tags": ["llama", "inference", "local", "quantization", "cpp"],
+      "about": "Run large language models locally using the llama.cpp inference engine with GPU acceleration and quantization support. Enables private local LLM inference without cloud dependencies.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "serving-llms-vllm",
+      "title": "Serving LLMs with vLLM",
+      "description": "Serve and deploy LLMs using the vLLM inference engine.",
+      "tags": ["vllm", "serving", "llm", "inference", "deployment"],
+      "about": "Deploy and serve large language models using vLLM for high-throughput low-latency inference with PagedAttention. Supports continuous batching and custom generation parameters.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "audiocraft-audio-generation",
+      "title": "Audiocraft Audio Generation",
+      "description": "Generate music and audio using Meta's Audiocraft models.",
+      "tags": ["audio", "music-generation", "audiocraft", "meta", "ai"],
+      "about": "Generate original music, sound effects, and audio content using Meta's Audiocraft suite including MusicGen and AudioGen models. Supports text-to-audio and melody conditioning.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "segment-anything-model",
+      "title": "Segment Anything Model",
+      "description": "Image segmentation using Meta's SAM (Segment Anything Model).",
+      "tags": ["segmentation", "image", "sam", "computer-vision", "meta"],
+      "about": "Perform zero-shot image segmentation using Meta's Segment Anything Model. Supports point prompts, box prompts, and automatic mask generation for any input image.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "weights-and-biases",
+      "title": "Weights & Biases",
+      "description": "Track ML experiments, log metrics, and manage model artifacts.",
+      "tags": ["wandb", "experiment-tracking", "mlops", "monitoring"],
+      "about": "Integrate with Weights & Biases for experiment tracking, hyperparameter optimization, model registry, and artifact management. Essential for reproducible ML workflows.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "evaluating-llms-harness",
+      "title": "Evaluating LLMs (Harness)",
+      "description": "Evaluate LLM performance using EleutherAI's LM Evaluation Harness.",
+      "tags": ["evaluation", "benchmark", "llm", "harness", "eleuther"],
+      "about": "Run standardized LLM evaluations using EleutherAI's LM Evaluation Harness. Supports hundreds of benchmarks including MMLU, HellaSwag, ARC, and custom evaluation tasks.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "dspy",
+      "title": "DSPy",
+      "description": "Programmatically optimize LLM prompts and pipelines with DSPy.",
+      "tags": ["dspy", "prompt-optimization", "llm", "programming"],
+      "about": "Use DSPy to automatically optimize LLM prompts and chains through programmatic compilation. Treats prompts as optimizable parameters for improved model performance.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "stable-diffusion",
+      "title": "Stable Diffusion",
+      "description": "Generate images from text prompts using Stable Diffusion models.",
+      "tags": ["stable-diffusion", "image-generation", "diffusion", "ai-art"],
+      "about": "Generate high-quality images from text prompts using Stable Diffusion model family. Supports txt2img, img2img, inpainting, ControlNet, and LoRA-based personalization.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "whisper",
+      "title": "Whisper",
+      "description": "Transcribe and translate audio using OpenAI Whisper.",
+      "tags": ["whisper", "speech-to-text", "transcription", "audio", "openai"],
+      "about": "Transcribe speech to text and translate audio across multiple languages using OpenAI Whisper. Supports various audio formats and accuracy levels from tiny to large models.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "obliteratus",
+      "title": "Obliteratus",
+      "description": "Dangerous red-teaming and system destruction testing tool.",
+      "tags": ["red-team", "destructive", "testing", "dangerous"],
+      "about": "High-risk testing tool for destructive operations and system boundary exploration. Intended only for controlled red-teaming environments with extreme caution required.",
+      "enabled_by_default": false
+    }
+  ],
+  "productivity": [
+    {
+      "name": "airtable",
+      "title": "Airtable",
+      "description": "Create, read, update, and manage Airtable bases and records.",
+      "tags": ["airtable", "database", "spreadsheet", "no-code"],
+      "about": "Full Airtable integration for managing bases, tables, records, and views. Supports CRUD operations, filtering, sorting, and formula field evaluation.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "google-workspace",
+      "title": "Google Workspace",
+      "description": "Integrate with Google Docs, Sheets, Drive, and Calendar.",
+      "tags": ["google", "docs", "sheets", "drive", "workspace"],
+      "about": "Comprehensive Google Workspace integration for creating and editing documents and spreadsheets, managing Drive files, and scheduling Calendar events with shared access.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "linear",
+      "title": "Linear",
+      "description": "Manage issues, projects, and sprints in Linear.",
+      "tags": ["linear", "project-management", "issues", "sprints"],
+      "about": "Full Linear project management integration for creating and tracking issues, managing sprints, organizing projects, and viewing team roadmaps through the Linear API.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "maps",
+      "title": "Maps",
+      "description": "Geocoding, directions, place search, and map visualizations.",
+      "tags": ["maps", "geocoding", "directions", "location", "navigation"],
+      "about": "Geographic capabilities including address geocoding, route planning, place search, and proximity queries. Can generate map visualizations for locations and routes.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "nano-pdf",
+      "title": "Nano PDF",
+      "description": "Generate and manipulate PDF documents programmatically.",
+      "tags": ["pdf", "documents", "generation", "report"],
+      "about": "Create, merge, split, and annotate PDF documents programmatically. Supports text layout, tables, images, and form filling for automated document generation workflows.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "notion",
+      "title": "Notion",
+      "description": "Create, read, and manage Notion pages, databases, and content.",
+      "tags": ["notion", "notes", "database", "wiki", "knowledge"],
+      "about": "Full Notion API integration for managing pages, databases, blocks, and users. Create rich documents, query database views, and sync content between Notion and other tools.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "ocr-and-documents",
+      "title": "OCR & Documents",
+      "description": "Extract text from images and scanned documents via OCR.",
+      "tags": ["ocr", "documents", "scanning", "text-extraction", "vision"],
+      "about": "Optical character recognition for extracting text from images, scanned PDFs, screenshots, and photographs. Supports multiple languages and various document layouts.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "powerpoint",
+      "title": "PowerPoint",
+      "description": "Create and edit PowerPoint presentations programmatically.",
+      "tags": ["powerpoint", "presentation", "slides", "office"],
+      "about": "Generate professional PowerPoint presentations with custom slide layouts, charts, images, animations, and speaker notes. Supports PPTX format for Microsoft Office compatibility.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "obsidian",
+      "title": "Obsidian",
+      "description": "Manage and search Obsidian vaults and markdown notes.",
+      "tags": ["obsidian", "notes", "markdown", "knowledge-graph", "vault"],
+      "about": "Full Obsidian vault integration for creating, reading, linking, and searching markdown notes. Supports graph view queries, tag navigation, and vault-wide full-text search.",
+      "enabled_by_default": true
+    }
+  ],
+  "research": [
+    {
+      "name": "arxiv",
+      "title": "arXiv",
+      "description": "Search and retrieve academic papers from the arXiv repository.",
+      "tags": ["arxiv", "research", "papers", "academic", "science"],
+      "about": "Search the arXiv repository for academic papers across physics, mathematics, computer science, and related fields. Returns abstracts, authors, and direct PDF links.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "blogwatcher",
+      "title": "Blogwatcher",
+      "description": "Monitor and summarize blog posts and technical articles.",
+      "tags": ["blogs", "monitoring", "summarization", "rss", "content"],
+      "about": "Track and summarize content from blogs, newsletters, and technical publications. Monitors RSS feeds and delivers concise digests of new articles and updates.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "llm-wiki",
+      "title": "LLM Wiki",
+      "description": "Query a curated wiki of LLM research, models, and techniques.",
+      "tags": ["llm", "wiki", "research", "models", "knowledge"],
+      "about": "Access a curated knowledge base of large language model research including model architectures, training techniques, benchmarks, and deployment best practices.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "polymarket",
+      "title": "Polymarket",
+      "description": "Query prediction markets and event outcomes on Polymarket.",
+      "tags": ["polymarket", "prediction-markets", "crypto", "forecasting"],
+      "about": "Access Polymarket prediction market data including event outcomes, trading volumes, and probability trends. Useful for research on collective intelligence and market forecasting.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "tool-capability-research",
+      "title": "Tool Capability Research",
+      "description": "Research and catalog AI tool capabilities and limitations.",
+      "tags": ["research", "tools", "capabilities", "benchmarking", "analysis"],
+      "about": "Systematic research into AI tool capabilities, limitations, and performance characteristics. Produces structured catalogs of what tools can and cannot do effectively.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "research-paper-writing",
+      "title": "Research Paper Writing",
+      "description": "Draft and format academic research papers with proper structure.",
+      "tags": ["research", "paper", "writing", "academic", "latex"],
+      "about": "Assist with drafting academic research papers including abstract writing, literature review organization, methodology description, and proper formatting for publication venues.",
+      "enabled_by_default": true
+    },
+    {
+      "name": "searxng-search",
+      "title": "SearXNG Search",
+      "description": "Private web search via self-hosted SearXNG meta-search engine.",
+      "tags": ["search", "searxng", "web", "privacy", "research"],
+      "about": "Perform private web searches through a self-hosted SearXNG meta-search engine that aggregates results from multiple search providers without tracking user queries.",
+      "enabled_by_default": true
+    }
+  ],
+  "social-media": [
+    {
+      "name": "xurl",
+      "title": "X/Twitter URL",
+      "description": "Fetch and display X (Twitter) posts and thread content.",
+      "tags": ["twitter", "x", "social-media", "posts", "threads"],
+      "about": "Retrieve and display content from X/Twitter posts and threads. Fetches tweet text, media, engagement metrics, and conversation context for analysis and sharing.",
+      "enabled_by_default": true
+    }
+  ],
+  "smart-home": [
+    {
+      "name": "openhue",
+      "title": "OpenHue",
+      "description": "Control Philips Hue smart lights and lighting scenes.",
+      "tags": ["hue", "smart-home", "lighting", "philips", "iot"],
+      "about": "Control Philips Hue lighting systems including individual bulbs, rooms, zones, and scenes. Supports brightness, color temperature, RGB color, and scheduled routines.",
+      "enabled_by_default": true
+    }
+  ],
+  "gaming": [
+    {
+      "name": "pokemon-player",
+      "title": "Pokémon Player",
+      "description": "Play classic Pokémon games through an emulated GameBoy interface.",
+      "tags": ["pokemon", "gaming", "emulator", "gameboy", "retro"],
+      "about": "Play classic Pokémon titles including Red, Blue, Crystal, and Emerald through an emulated GameBoy environment with screen capture and keyboard input relay.",
+      "enabled_by_default": false
+    },
+    {
+      "name": "minecraft-modpack-server",
+      "title": "Minecraft Modpack Server",
+      "description": "Deploy and manage Minecraft modpack servers.",
+      "tags": ["minecraft", "server", "modpack", "gaming", "deployment"],
+      "about": "Deploy, configure, and manage Minecraft servers running custom modpacks. Handles server installation, mod management, whitelist configuration, and backup scheduling.",
+      "enabled_by_default": false
+    }
+  ],
+  "note-taking": [
+    {
+      "name": "obsidian",
+      "title": "Obsidian",
+      "description": "Manage and search Obsidian vaults and markdown notes.",
+      "tags": ["obsidian", "notes", "markdown", "knowledge-graph", "vault"],
+      "about": "Full Obsidian vault integration for creating, reading, linking, and searching markdown notes. Supports graph view queries, tag navigation, and vault-wide full-text search.",
+      "enabled_by_default": true
+    }
+  ],
+  "red-teaming": [
+    {
+      "name": "godmode",
+      "title": "Godmode",
+      "description": "Unrestricted system access for security research and red-teaming.",
+      "tags": ["red-team", "security", "research", "pentesting"],
+      "about": "Provides unrestricted system access capabilities for authorized security research and penetration testing. Intended exclusively for controlled red-teaming engagements.",
+      "enabled_by_default": false
+    }
+  ]
+}

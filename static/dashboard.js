@@ -71,6 +71,8 @@ async function initDashboard() {
   await loadProfile();
   await loadProviders();
   await loadOAuthProviders();
+  await loadSkills();
+  await loadInstalledSkills();
   await loadSlashCommands();
   setSandboxStatus('idle');
   switchView('chat');
@@ -381,16 +383,29 @@ async function loadProviders() {
     const d = await apiJSON('/api/providers');
     const select = document.getElementById('provider-select');
     select.innerHTML = '<option value="">Select provider...</option>';
-    // Add API key providers
-    d.providers.filter(p => p.requires_key).forEach(p => {
+
+    // Group providers by auth type for the select
+    // Show api_key providers in the select
+    d.providers.filter(p => p.auth_type === 'api_key' && p.env_var).forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;
-      // Show which also support OAuth
-      const label = p.has_oauth ? p.name + ' (or OAuth)' : p.name;
-      opt.textContent = label;
+      opt.textContent = p.name + (p.signup_url ? '' : '');
       select.appendChild(opt);
     });
+
+    // Add auth-type annotations to the provider UI
+    updateAuthProviderUI(d.providers);
   } catch(e) { console.error('Failed to load providers:', e); }
+}
+
+function updateAuthProviderUI(providers) {
+  const connCard = document.getElementById('conn-card');
+  const connName = document.getElementById('conn-name');
+  const connDetail = document.getElementById('conn-detail');
+  const connBadge = document.getElementById('conn-badge');
+
+  // Build the OAuth grid with auth_type badges
+  // This is done in loadOAuthProviders now
 }
 
 function updateModels() {
@@ -398,7 +413,6 @@ function updateModels() {
   const modelSelect = document.getElementById('model-select');
   modelSelect.innerHTML = '<option value="">Select model...</option>';
   if (!provider) return;
-  // Show placeholder — models are fetched per-provider
   modelSelect.innerHTML = '<option value="">Auto-detect (uses provider default)</option>';
 }
 
@@ -445,16 +459,25 @@ function closeOAuthModal() {
   if (OAUTH_POPUP && !OAUTH_POPUP.closed) OAUTH_POPUP.close();
 }
 
-// ── Provider OAuth buttons ──
+// ── Provider OAuth buttons (all 8 OAuth providers with auth_type badges) ──
 const OAUTH_PROVIDERS = [
-  { id: 'openai-oauth', name: 'ChatGPT (OpenAI)', subtitle: 'Existing Plan', color: '#10a37f', icon: 'C' },
-  { id: 'anthropic-oauth', name: 'Claude (Anthropic)', subtitle: 'Existing Plan', color: '#d97757', icon: 'C' },
-  { id: 'google-oauth', name: 'Google', subtitle: 'Gemini models', color: '#4285f4', icon: 'G' },
-  { id: 'nous-oauth', name: 'Nous Portal', subtitle: 'Research models', color: '#8b5cf6', icon: 'N' },
-  { id: 'qwen-oauth', name: 'Qwen (Alibaba)', subtitle: 'Cloud account', color: '#ff6a00', icon: 'Q' },
-  { id: 'github-copilot', name: 'GitHub Copilot', subtitle: 'Subscription', color: '#6e40c9', icon: 'G' },
-  { id: 'openai-codex-oauth', name: 'OpenAI Codex', subtitle: 'Codex plan', color: '#10a37f', icon: 'X' },
+  { id: 'openai-oauth', name: 'ChatGPT (OpenAI)', subtitle: 'Existing Plan', auth_type: 'oauth_external', color: '#10a37f', icon: 'C' },
+  { id: 'anthropic-oauth', name: 'Claude (Anthropic)', subtitle: 'Existing Plan', auth_type: 'oauth_external', color: '#d97757', icon: 'C' },
+  { id: 'openai-codex-oauth', name: 'OpenAI Codex', subtitle: 'Codex Plan', auth_type: 'oauth_external', color: '#10a37f', icon: 'X' },
+  { id: 'google-oauth', name: 'Google', subtitle: 'Gemini models', auth_type: 'oauth_external', color: '#4285f4', icon: 'G' },
+  { id: 'nous-oauth', name: 'Nous Portal', subtitle: 'Device Code', auth_type: 'oauth_device_code', color: '#8b5cf6', icon: 'N' },
+  { id: 'qwen-oauth', name: 'Qwen (Alibaba)', subtitle: 'Cloud account', auth_type: 'oauth_external', color: '#ff6a00', icon: 'Q' },
+  { id: 'minimax-oauth', name: 'MiniMax', subtitle: 'OAuth Login', auth_type: 'oauth_external', color: '#6366f1', icon: 'M' },
+  { id: 'github-copilot', name: 'GitHub Copilot', subtitle: 'Subscription', auth_type: 'copilot', color: '#6e40c9', icon: 'G' },
 ];
+
+// Auth type labels for UI
+const AUTH_TYPE_LABELS = {
+  'oauth_external': 'Login with existing plan',
+  'oauth_device_code': 'Device code login',
+  'copilot': 'GitHub Copilot login',
+  'aws_sdk': 'AWS credentials',
+};
 
 async function loadOAuthProviders() {
   const grid = document.getElementById('oauth-providers');
@@ -462,10 +485,12 @@ async function loadOAuthProviders() {
   OAUTH_PROVIDERS.forEach(p => {
     const card = document.createElement('div');
     card.className = 'oauth-card';
+    const badge = AUTH_TYPE_LABELS[p.auth_type] || '';
     card.innerHTML = `
       <div class="prov-icon" style="background:${p.color};color:#fff">${p.icon || p.name[0]}</div>
       <h4>${p.name}</h4>
       <p>${p.subtitle || 'OAuth login'}</p>
+      <span style="font-size:.625rem;color:var(--muted);margin-bottom:4px">${badge}</span>
       <button class="btn btn-sm btn-ghost" onclick="startOAuth('${p.id}')">Connect</button>`;
     grid.appendChild(card);
   });
@@ -480,65 +505,90 @@ function switchSettingsTab(tab) {
   if (el) el.classList.add('active');
 }
 
-// ── Chat (Proxied to sandbox bapX) ──
-const CHAT_HISTORY = [];
+// ── Skills ──
+let allSkills = {};
 
-function addMessage(text, role) {
-  const el = document.getElementById('chat-messages');
-  const empty = el.querySelector('.empty-state');
-  if (empty) empty.remove();
-  const div = document.createElement('div');
-  div.className = `chat-msg ${role}`;
-  div.textContent = text;
-  el.appendChild(div);
-  el.scrollTop = el.scrollHeight;
-}
-
-function addTypingIndicator() {
-  const el = document.getElementById('chat-messages');
-  const empty = el.querySelector('.empty-state');
-  if (empty) empty.remove();
-  const div = document.createElement('div');
-  div.className = 'typing-indicator'; div.id = 'typing-indicator';
-  div.innerHTML = '<span></span><span></span><span></span>';
-  el.appendChild(div);
-  el.scrollTop = el.scrollHeight;
-}
-
-function removeTypingIndicator() {
-  const el = document.getElementById('typing-indicator');
-  if (el) el.remove();
-}
-
-async function sendMessage() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  CHAT_HISTORY.push({role:'user', content:text});
-  addMessage(text, 'user');
-  addTypingIndicator();
-  const sendBtn = document.getElementById('send-btn');
-  sendBtn.disabled = true;
+async function loadSkills() {
   try {
-    // Execute via sandbox — bapX inside handles the response
-    const escaped = text.replace(/'/g, "'\\''");
-    const result = await apiJSON('/api/sandbox/exec', {
-      method:'POST', body:JSON.stringify({
-        command: `cd ~ && echo '${escaped}' | bapX exec --timeout 120 2>/dev/null || echo 'Agent busy'`,
-        language: 'bash'
-      })
-    });
-    removeTypingIndicator();
-    const response = result.output || 'No response from agent';
-    CHAT_HISTORY.push({role:'assistant', content:response});
-    addMessage(response, 'assistant');
+    const d = await apiJSON('/api/skills');
+    allSkills = d.skills || {};
+    renderSkills();
+    const total = Object.values(allSkills).reduce((sum, arr) => sum + (arr ? arr.length : 0), 0);
+    document.getElementById('skills-count-badge').textContent = total;
   } catch(e) {
-    removeTypingIndicator();
-    addMessage(`Error: ${e.message}`, 'assistant');
+    document.getElementById('skills-categories').innerHTML = '<p style="color:var(--muted);font-size:.875rem">Skills unavailable</p>';
   }
-  sendBtn.disabled = false;
 }
+
+function renderSkills() {
+  const container = document.getElementById('skills-categories');
+  const categories = Object.keys(allSkills);
+  if (!categories.length) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:.875rem">No skills available</p>';
+    return;
+  }
+  container.innerHTML = categories.map(cat => {
+    const skills = allSkills[cat] || [];
+    const catLabel = cat.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return `
+      <div style="margin-bottom:1.5rem">
+        <h4 style="font-size:.8125rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.75rem">${catLabel} <span style="font-weight:400;font-size:.6875rem">(${skills.length})</span></h4>
+        <div class="skills-grid">
+          ${skills.map(s => {
+            const isDefault = s.enabled_by_default !== false;
+            return `
+              <div class="skill-card">
+                <h4>${s.title || s.name}</h4>
+                <p>${s.description || ''}</p>
+                ${s.tags ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${s.tags.slice(0,3).map(t => `<span class="cat-badge">${t}</span>`).join('')}</div>` : ''}
+                <button class="btn btn-sm ${isDefault ? 'btn-ghost' : ''}" onclick="installSkill('${s.name}')" style="margin-top:auto">${isDefault ? 'Install' : 'Enable'}</button>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function installSkill(name) {
+  // Find skill in allSkills
+  let skill = null;
+  for (const cat of Object.values(allSkills)) {
+    skill = cat.find(s => s.name === name);
+    if (skill) break;
+  }
+  if (!skill) { alert('Skill not found'); return; }
+  try {
+    const content = `# ${skill.title || skill.name}\n\n${skill.about || skill.description || ''}\n\n## Tags\n${(skill.tags || []).join(', ')}`;
+    await apiJSON('/api/sandbox/install-skill', {
+      method:'POST', body:JSON.stringify({name: skill.name, content})
+    });
+    alert(`✓ Installed "${skill.title || skill.name}"`);
+    loadInstalledSkills();
+  } catch(e) {
+    alert('Failed: ' + e.message);
+  }
+}
+
+async function loadInstalledSkills() {
+  try {
+    const d = await apiJSON('/api/sandbox/skills');
+    const list = document.getElementById('installed-skills-list');
+    const skills = d.skills || [];
+    if (!skills.length) {
+      list.innerHTML = '<p style="color:var(--muted);font-size:.875rem">None installed. Browse skills above and click Install.</p>';
+      return;
+    }
+    list.innerHTML = skills.map(s => `
+      <div class="skill-card" style="margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h4 style="margin:0">${s}</h4>
+        </div>
+        <span class="conn-badge connected"><span class="dot"></span> Installed</span>
+      </div>`
+    ).join('');
+  } catch(e) { console.error(e); }
+}
+
 
 // ── Billing ──
 async function loadBilling() {

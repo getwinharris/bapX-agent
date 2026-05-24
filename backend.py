@@ -34,103 +34,169 @@ DATA_DIR = Path(os.environ.get("BAPX_DATA_DIR", str(BASE_DIR / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 SANDBOX_BASE_URL = "http://127.0.0.1:8080"
 
-# ── Provider Configuration (mirrors Hermes Agent provider list) ──
+# ── Provider Configuration (full Hermes parity: 34+ providers, 6 auth types) ──
+# auth_type: api_key | oauth_external | oauth_device_code | copilot | aws_sdk
 ALL_PROVIDERS = {
-    "openai":           {"name": "OpenAI", "models": ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo","o1","o1-mini","o3-mini"], "env": "OPENAI_API_KEY", "oauth": True},
-    "anthropic":        {"name": "Anthropic", "models": ["claude-sonnet-4","claude-opus-4","claude-haiku-3.5","claude-sonnet-3.5"], "env": "ANTHROPIC_API_KEY", "oauth": True},
-    "openrouter":       {"name": "OpenRouter", "models": ["*"], "env": "OPENROUTER_API_KEY"},
-    "google":           {"name": "Google Gemini", "models": ["gemini-2.5-pro","gemini-2.5-flash","gemini-2.0-flash"], "env": "GOOGLE_API_KEY", "oauth": True},
-    "deepseek":         {"name": "DeepSeek", "models": ["deepseek-chat","deepseek-reasoner"], "env": "DEEPSEEK_API_KEY"},
-    "xai":              {"name": "xAI / Grok", "models": ["grok-3","grok-3-mini","grok-2","grok-2-mini"], "env": "XAI_API_KEY"},
-    "huggingface":      {"name": "HuggingFace", "models": ["*"], "env": "HF_TOKEN"},
-    "github":           {"name": "GitHub Models", "models": ["*"], "env": "GITHUB_TOKEN"},
-    "mistral":          {"name": "Mistral", "models": ["mistral-large-latest","mistral-small-latest","codestral-latest"], "env": "MISTRAL_API_KEY"},
-    "groq":             {"name": "Groq", "models": ["llama-3.3-70b-versatile","llama-3.1-8b-instant","mixtral-8x7b-32768"], "env": "GROQ_API_KEY"},
-    "perplexity":       {"name": "Perplexity", "models": ["sonar-pro","sonar","sonar-deep-research"], "env": "PERPLEXITY_API_KEY"},
-    "together":         {"name": "Together AI", "models": ["*"], "env": "TOGETHER_API_KEY"},
-    "fireworks":        {"name": "Fireworks AI", "models": ["*"], "env": "FIREWORKS_API_KEY"},
-    "cohere":           {"name": "Cohere", "models": ["command-r-plus","command-r","command-a"], "env": "COHERE_API_KEY"},
-    "replicate":        {"name": "Replicate", "models": ["*"], "env": "REPLICATE_API_KEY"},
-    "kimi":             {"name": "Kimi / Moonshot", "models": ["moonshot-v1-8k","moonshot-v1-32k","moonshot-v1-128k"], "env": "KIMI_API_KEY"},
-    "qwen":             {"name": "Qwen (Alibaba)", "models": ["qwen-max","qwen-plus","qwen-turbo","qwq-32b"], "env": "DASHSCOPE_API_KEY", "oauth": True},
-    "zhipu":            {"name": "ZHIPU AI", "models": ["glm-4","glm-4-air","glm-4-flash"], "env": "ZHIPU_API_KEY"},
-    "minimax":          {"name": "MiniMax", "models": ["minimax-text-01","minimax-reasoning"], "env": "MINIMAX_API_KEY"},
-    "minimax-cn":       {"name": "MiniMax CN", "models": ["minimax-text-01","minimax-reasoning"], "env": "MINIMAX_CN_API_KEY"},
-    "deepinfra":        {"name": "DeepInfra", "models": ["*"], "env": "DEEPINFRA_API_KEY"},
-    "nous":             {"name": "Nous Portal", "models": ["*"], "env": "NOUS_API_KEY", "oauth": True},
-    "copilot":          {"name": "GitHub Copilot", "models": ["gpt-4o","claude-sonnet-4"], "oauth": True},
-    "elevenlabs":       {"name": "ElevenLabs", "models": ["*"], "env": "ELEVENLABS_API_KEY"},
-    "xiaomi":           {"name": "Xiaomi MiMo", "models": ["mimo-pro","mimo-lite"], "env": "XIAOMI_API_KEY"},
-    "kilocode":         {"name": "Kilo Code", "models": ["*"], "env": "KILOCODE_API_KEY"},
-    "ai-gateway":       {"name": "AI Gateway (Vercel)", "models": ["*"], "env": "AI_GATEWAY_API_KEY"},
-    "opencode-zen":     {"name": "OpenCode Zen", "models": ["*"], "env": "OPENCODE_ZEN_API_KEY"},
-    "opencode-go":      {"name": "OpenCode Go", "models": ["*"], "env": "OPENCODE_GO_API_KEY"},
-    "custom":           {"name": "Custom Endpoint", "models": ["custom"], "custom_url": True},
+    # ── OpenAI / ChatGPT ──
+    "openai":           {"name": "OpenAI", "models": ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo","o1","o1-mini","o3-mini"], "env": "OPENAI_API_KEY", "auth_type": "api_key", "oauth_provider": "openai-oauth", "signup_url": "https://platform.openai.com/api-keys"},
+    "openai-oauth":     {"name": "ChatGPT (OpenAI)", "models": ["gpt-4o","gpt-4o-mini","o1","o3-mini"], "auth_type": "oauth_external", "display": "Existing Plan (GPT Plus/Pro)", "oauth_provider": "openai-oauth"},
+    "openai-codex":     {"name": "OpenAI Codex", "models": ["gpt-4o-codex","o3-codex"], "auth_type": "oauth_external", "display": "Codex Plan", "oauth_provider": "openai-codex-oauth", "signup_url": "https://codex.chat/"},
+
+    # ── Anthropic / Claude ──
+    "anthropic":        {"name": "Anthropic", "models": ["claude-sonnet-4","claude-opus-4","claude-haiku-3.5","claude-sonnet-3.5"], "env": "ANTHROPIC_API_KEY", "auth_type": "api_key", "oauth_provider": "anthropic-oauth", "signup_url": "https://console.anthropic.com/"},
+    "anthropic-oauth":  {"name": "Claude (Anthropic)", "models": ["claude-sonnet-4","claude-opus-4"], "auth_type": "oauth_external", "display": "Existing Plan (Claude Pro/Max)", "oauth_provider": "anthropic-oauth"},
+
+    # ── Google / Gemini ──
+    "google":           {"name": "Google Gemini", "models": ["gemini-2.5-pro","gemini-2.5-flash","gemini-2.0-flash"], "env": "GOOGLE_API_KEY", "auth_type": "api_key", "oauth_provider": "google-oauth", "signup_url": "https://aistudio.google.com/apikey"},
+    "google-oauth":     {"name": "Google Gemini", "models": ["gemini-2.5-pro","gemini-2.5-flash"], "auth_type": "oauth_external", "display": "Login with Google", "oauth_provider": "google-oauth"},
+
+    # ── Major API providers ──
+    "openrouter":       {"name": "OpenRouter", "models": ["*"], "env": "OPENROUTER_API_KEY", "auth_type": "api_key", "signup_url": "https://openrouter.ai/keys"},
+    "deepseek":         {"name": "DeepSeek", "models": ["deepseek-chat","deepseek-reasoner"], "env": "DEEPSEEK_API_KEY", "auth_type": "api_key", "signup_url": "https://platform.deepseek.com/"},
+    "xai":              {"name": "xAI / Grok", "models": ["grok-3","grok-3-mini","grok-2","grok-2-mini"], "env": "XAI_API_KEY", "auth_type": "api_key", "signup_url": "https://console.x.ai/"},
+    "mistral":          {"name": "Mistral", "models": ["mistral-large-latest","mistral-small-latest","codestral-latest"], "env": "MISTRAL_API_KEY", "auth_type": "api_key", "signup_url": "https://console.mistral.ai/"},
+    "groq":             {"name": "Groq", "models": ["llama-3.3-70b-versatile","llama-3.1-8b-instant","mixtral-8x7b-32768"], "env": "GROQ_API_KEY", "auth_type": "api_key", "signup_url": "https://console.groq.com/keys"},
+    "perplexity":       {"name": "Perplexity", "models": ["sonar-pro","sonar","sonar-deep-research"], "env": "PERPLEXITY_API_KEY", "auth_type": "api_key", "signup_url": "https://www.perplexity.ai/settings/api"},
+    "together":         {"name": "Together AI", "models": ["*"], "env": "TOGETHER_API_KEY", "auth_type": "api_key"},
+    "fireworks":        {"name": "Fireworks AI", "models": ["*"], "env": "FIREWORKS_API_KEY", "auth_type": "api_key"},
+    "cohere":           {"name": "Cohere", "models": ["command-r-plus","command-r","command-a"], "env": "COHERE_API_KEY", "auth_type": "api_key"},
+    "replicate":        {"name": "Replicate", "models": ["*"], "env": "REPLICATE_API_KEY", "auth_type": "api_key"},
+    "deepinfra":        {"name": "DeepInfra", "models": ["*"], "env": "DEEPINFRA_API_KEY", "auth_type": "api_key", "signup_url": "https://deepinfra.com/"},
+
+    # ── Chinese providers ──
+    "kimi":             {"name": "Kimi / Moonshot", "models": ["moonshot-v1-8k","moonshot-v1-32k","moonshot-v1-128k"], "env": "KIMI_API_KEY", "auth_type": "api_key"},
+    "kimi-coding":      {"name": "Kimi Coding", "models": ["moonshot-v1-auto"], "env": "KIMI_CODING_API_KEY", "auth_type": "api_key"},
+    "qwen":             {"name": "Qwen (Alibaba)", "models": ["qwen-max","qwen-plus","qwen-turbo","qwq-32b"], "env": "DASHSCOPE_API_KEY", "auth_type": "api_key", "oauth_provider": "qwen-oauth", "signup_url": "https://bailian.console.alibabacloud.com/"},
+    "qwen-oauth":       {"name": "Qwen (Alibaba)", "models": ["qwen-max","qwen-plus"], "auth_type": "oauth_external", "display": "Alibaba Cloud Login", "oauth_provider": "qwen-oauth"},
+    "zhipu":            {"name": "ZHIPU AI", "models": ["glm-4","glm-4-air","glm-4-flash"], "env": "ZHIPU_API_KEY", "auth_type": "api_key"},
+    "minimax":          {"name": "MiniMax", "models": ["minimax-text-01","minimax-reasoning"], "env": "MINIMAX_API_KEY", "auth_type": "api_key"},
+    "minimax-oauth":    {"name": "MiniMax", "models": ["minimax-text-01","minimax-reasoning"], "auth_type": "oauth_external", "display": "MiniMax Login", "oauth_provider": "minimax-oauth"},
+    "minimax-cn":       {"name": "MiniMax CN", "models": ["minimax-text-01","minimax-reasoning"], "env": "MINIMAX_CN_API_KEY", "auth_type": "api_key"},
+    "stepfun":          {"name": "StepFun (阶跃星辰)", "models": ["step-2","step-1"], "env": "STEPFUN_API_KEY", "auth_type": "api_key"},
+    "xiaomi":           {"name": "Xiaomi MiMo", "models": ["mimo-pro","mimo-lite"], "env": "XIAOMI_API_KEY", "auth_type": "api_key"},
+
+    # ── Cloud & enterprise ──
+    "huggingface":      {"name": "HuggingFace", "models": ["*"], "env": "HF_TOKEN", "auth_type": "api_key", "signup_url": "https://huggingface.co/settings/tokens"},
+    "github":           {"name": "GitHub Models", "models": ["*"], "env": "GITHUB_TOKEN", "auth_type": "api_key"},
+    "bedrock":          {"name": "AWS Bedrock", "models": ["claude-sonnet-4","claude-haiku-3.5","llama-3.3-70b","mistral-large"], "auth_type": "aws_sdk", "display": "AWS Credentials (IAM / SSO)", "signup_url": "https://aws.amazon.com/bedrock/"},
+    "azure":            {"name": "Azure AI Foundry", "models": ["*"], "env": "AZURE_API_KEY", "auth_type": "api_key", "signup_url": "https://ai.azure.com/"},
+
+    # ── Niche / GPU cloud ──
+    "nous":             {"name": "Nous Portal", "models": ["*"], "env": "NOUS_API_KEY", "auth_type": "api_key", "oauth_provider": "nous-oauth", "signup_url": "https://portal.nousresearch.com/"},
+    "nous-oauth":       {"name": "Nous Portal", "models": ["*"], "auth_type": "oauth_device_code", "display": "Device Code Login", "oauth_provider": "nous-oauth"},
+    "gmi":              {"name": "GMI Cloud", "models": ["*"], "env": "GMI_API_KEY", "auth_type": "api_key", "signup_url": "https://www.gmicloud.ai/"},
+    "nvidia":           {"name": "Nvidia NIM", "models": ["*"], "env": "NVIDIA_API_KEY", "auth_type": "api_key", "signup_url": "https://build.nvidia.com/"},
+    "novita":           {"name": "Novita AI", "models": ["*"], "env": "NOVITA_API_KEY", "auth_type": "api_key", "signup_url": "https://novita.ai/"},
+    "arcee":            {"name": "Arcee AI", "models": ["*"], "env": "ARCEE_API_KEY", "auth_type": "api_key"},
+    "ollama-cloud":     {"name": "Ollama Cloud", "models": ["*"], "env": "OLLAMA_CLOUD_API_KEY", "auth_type": "api_key"},
+    "zai":              {"name": "Z-AI (Zencoder)", "models": ["z-3-mini","z-3"], "env": "ZAI_API_KEY", "auth_type": "api_key"},
+
+    # ── First-party agent SDKs ──
+    "copilot":          {"name": "GitHub Copilot", "models": ["gpt-4o","claude-sonnet-4"], "auth_type": "copilot", "display": "GitHub Copilot Subscription", "oauth_provider": "github-copilot", "signup_url": "https://github.com/settings/copilot"},
+    "copilot-acp":      {"name": "GitHub Copilot (ACP)", "models": ["gpt-4o","claude-sonnet-4"], "auth_type": "external_process", "display": "ACP Subprocess"},
+
+    # ── Gateway / aggregator ──
+    "ai-gateway":       {"name": "AI Gateway (Vercel)", "models": ["*"], "env": "AI_GATEWAY_API_KEY", "auth_type": "api_key"},
+
+    # ── Other tool providers ──
+    "elevenlabs":       {"name": "ElevenLabs", "models": ["*"], "env": "ELEVENLABS_API_KEY", "auth_type": "api_key"},
+    "kilocode":         {"name": "Kilo Code", "models": ["*"], "env": "KILOCODE_API_KEY", "auth_type": "api_key"},
+    "opencode-zen":     {"name": "OpenCode Zen", "models": ["*"], "env": "OPENCODE_ZEN_API_KEY", "auth_type": "api_key"},
+    "opencode-go":      {"name": "OpenCode Go", "models": ["*"], "env": "OPENCODE_GO_API_KEY", "auth_type": "api_key"},
+    "alibaba-coding":   {"name": "Alibaba Coding Plan", "models": ["qwen-max","qwen-plus"], "env": "ALIBABA_CODING_API_KEY", "auth_type": "api_key"},
+
+    # ── Custom endpoint ──
+    "custom":           {"name": "Custom Endpoint", "models": ["custom"], "custom_url": True, "auth_type": "api_key"},
 }
 
 OAUTH_CONFIGS = {
     "openai-oauth": {
         "provider_name": "ChatGPT (OpenAI) — Existing Plan",
+        "auth_type": "oauth_external",
         "client_id": "bapx-oauth-openai",
         "authorization_url": "https://auth.openai.com/authorize",
         "token_url": "https://auth.openai.com/oauth/token",
         "scopes": ["openid","email","profile","models.read","chat.write"],
         "description": "Use your existing ChatGPT Plus/Pro subscription",
         "connect_label": "Login with ChatGPT",
-    },
-    "anthropic-oauth": {
-        "provider_name": "Claude (Anthropic) — Existing Plan",
-        "client_id": "bapx-oauth-anthropic",
-        "authorization_url": "https://auth.anthropic.com/authorize",
-        "token_url": "https://auth.anthropic.com/oauth/token",
-        "scopes": ["openid","email","profile","models.read","messages.write"],
-        "description": "Use your existing Claude Pro/Max subscription",
-        "connect_label": "Login with Claude",
-    },
-    "google-oauth": {
-        "provider_name": "Google",
-        "client_id": "bapx-oauth-google",
-        "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
-        "token_url": "https://oauth2.googleapis.com/token",
-        "scopes": ["openid","email","profile","https://www.googleapis.com/auth/generative-language"],
-        "description": "Use your Google account for Gemini models",
-        "connect_label": "Login with Google",
-    },
-    "nous-oauth": {
-        "provider_name": "Nous Portal",
-        "client_id": "bapx-oauth-nous",
-        "authorization_url": "https://auth.nousresearch.com/authorize",
-        "token_url": "https://auth.nousresearch.com/oauth/token",
-        "scopes": ["openid","email","profile"],
-        "description": "Login via Nous Research Portal",
-        "connect_label": "Login with Nous",
-    },
-    "qwen-oauth": {
-        "provider_name": "Qwen (Alibaba)",
-        "client_id": "bapx-oauth-qwen",
-        "authorization_url": "https://oauth.alibaba.com/authorize",
-        "token_url": "https://oauth.alibaba.com/oauth/token",
-        "scopes": ["openid","email","profile","models.read"],
-        "description": "Use your Alibaba Cloud account for Qwen models",
-        "connect_label": "Login with Alibaba",
-    },
-    "github-copilot": {
-        "provider_name": "GitHub Copilot",
-        "client_id": "bapx-oauth-github",
-        "authorization_url": "https://github.com/login/oauth/authorize",
-        "token_url": "https://github.com/login/oauth/access_token",
-        "scopes": ["read:user","user:email","copilot"],
-        "description": "Use your GitHub Copilot subscription",
-        "connect_label": "Login with GitHub Copilot",
+        "icon": "C", "color": "#10a37f",
     },
     "openai-codex-oauth": {
         "provider_name": "OpenAI Codex",
+        "auth_type": "oauth_external",
         "client_id": "bapx-oauth-codex",
         "authorization_url": "https://auth.openai.com/authorize",
         "token_url": "https://auth.openai.com/oauth/token",
         "scopes": ["openid","email","profile","models.read","codex.write"],
         "description": "Login with OpenAI Codex subscription",
         "connect_label": "Login with Codex",
+        "icon": "X", "color": "#10a37f",
+    },
+    "anthropic-oauth": {
+        "provider_name": "Claude (Anthropic) — Existing Plan",
+        "auth_type": "oauth_external",
+        "client_id": "bapx-oauth-anthropic",
+        "authorization_url": "https://auth.anthropic.com/authorize",
+        "token_url": "https://auth.anthropic.com/oauth/token",
+        "scopes": ["openid","email","profile","models.read","messages.write"],
+        "description": "Use your existing Claude Pro/Max subscription",
+        "connect_label": "Login with Claude",
+        "icon": "C", "color": "#d97757",
+    },
+    "google-oauth": {
+        "provider_name": "Google",
+        "auth_type": "oauth_external",
+        "client_id": "bapx-oauth-google",
+        "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "scopes": ["openid","email","profile","https://www.googleapis.com/auth/generative-language"],
+        "description": "Use your Google account for Gemini models",
+        "connect_label": "Login with Google",
+        "icon": "G", "color": "#4285f4",
+    },
+    "nous-oauth": {
+        "provider_name": "Nous Portal",
+        "auth_type": "oauth_device_code",
+        "client_id": "bapx-oauth-nous",
+        "authorization_url": "https://auth.nousresearch.com/authorize",
+        "token_url": "https://auth.nousresearch.com/oauth/token",
+        "scopes": ["openid","email","profile"],
+        "description": "Login via Nous Research Portal — device code flow",
+        "connect_label": "Login with Nous",
+        "icon": "N", "color": "#8b5cf6",
+    },
+    "qwen-oauth": {
+        "provider_name": "Qwen (Alibaba)",
+        "auth_type": "oauth_external",
+        "client_id": "bapx-oauth-qwen",
+        "authorization_url": "https://oauth.alibaba.com/authorize",
+        "token_url": "https://oauth.alibaba.com/oauth/token",
+        "scopes": ["openid","email","profile","models.read"],
+        "description": "Use your Alibaba Cloud account for Qwen models",
+        "connect_label": "Login with Alibaba",
+        "icon": "Q", "color": "#ff6a00",
+    },
+    "minimax-oauth": {
+        "provider_name": "MiniMax",
+        "auth_type": "oauth_external",
+        "client_id": "bapx-oauth-minimax",
+        "authorization_url": "https://oauth.minimaxi.com/authorize",
+        "token_url": "https://oauth.minimaxi.com/oauth/token",
+        "scopes": ["openid","email","profile","models.read"],
+        "description": "Login with MiniMax account",
+        "connect_label": "Login with MiniMax",
+        "icon": "M", "color": "#6366f1",
+    },
+    "github-copilot": {
+        "provider_name": "GitHub Copilot",
+        "auth_type": "copilot",
+        "client_id": "bapx-oauth-github",
+        "authorization_url": "https://github.com/login/device",
+        "token_url": "https://github.com/login/oauth/access_token",
+        "scopes": ["read:user","user:email","copilot"],
+        "description": "Use your GitHub Copilot subscription",
+        "connect_label": "Login with GitHub Copilot",
+        "icon": "G", "color": "#6e40c9",
     },
 }
 OAUTH_FLOWS: dict[str, dict] = {}  # flow_id -> {provider, user_code, device_code, verification_uri, status, oauth_data, user_id}
@@ -644,13 +710,13 @@ def verify_email(req: VerifyEmailReq, request: Request):
 @app.post("/api/auth/oauth/start")
 @limiter.limit("10/minute")
 async def oauth_start(req: OAuthStartReq, request: Request, user: dict = Depends(get_current_user)):
-    """Start OAuth device code flow for a provider. Returns user_code + verification_uri."""
+    """Start OAuth flow for a provider. Handles oauth_external, oauth_device_code, copilot."""
     provider = req.provider
     if provider not in OAUTH_CONFIGS:
         raise HTTPException(400, f"Unknown OAuth provider: {provider}")
     cfg = OAUTH_CONFIGS[provider]
+    auth_type = cfg.get("auth_type", "oauth_external")
 
-    # Generate a device code flow
     flow_id = uuid.uuid4().hex
     user_code = gen_code(8)
     device_code = uuid.uuid4().hex
@@ -663,6 +729,7 @@ async def oauth_start(req: OAuthStartReq, request: Request, user: dict = Depends
         "device_code": device_code,
         "verification_uri": verification_uri,
         "status": "pending",
+        "auth_type": auth_type,
         "oauth_data": None,
         "user_id": user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -671,6 +738,7 @@ async def oauth_start(req: OAuthStartReq, request: Request, user: dict = Depends
     return {
         "flow_id": flow_id,
         "provider_name": cfg["provider_name"],
+        "auth_type": auth_type,
         "user_code": user_code,
         "device_code": device_code,
         "verification_uri": verification_uri,
@@ -730,28 +798,23 @@ async def oauth_token_exchange(req: OAuthTokenExchangeReq, user: dict = Depends(
 # ── Provider API (list available providers and models) ──
 @app.get("/api/providers")
 async def list_providers(user: dict = Depends(get_current_user)):
-    """List all available model providers and their models."""
+    """List all available model providers and their connection methods (6 auth types)."""
     providers = []
     for key, cfg in ALL_PROVIDERS.items():
-        oauth_provider_id = None
-        if cfg.get("oauth"):
-            # Find matching OAuth config
-            for okey, ocfg in OAUTH_CONFIGS.items():
-                # Match: openai → openai-oauth, anthropic → anthropic-oauth, etc.
-                if okey.startswith(key) or okey.startswith(cfg.get("name", "").lower().split()[0]):
-                    oauth_provider_id = okey
-                    break
-            if not oauth_provider_id:
-                oauth_provider_id = f"{key}-oauth"
-        providers.append({
+        p = {
             "id": key,
             "name": cfg["name"],
             "models": cfg["models"],
-            "requires_key": not cfg.get("oauth"),
-            "has_oauth": cfg.get("oauth", False),
-            "oauth_provider_id": oauth_provider_id,
+            "auth_type": cfg.get("auth_type", "api_key"),
+            "display": cfg.get("display", ""),
             "custom_url": cfg.get("custom_url", False),
-        })
+            "signup_url": cfg.get("signup_url", ""),
+            "oauth_provider_id": cfg.get("oauth_provider", None),
+        }
+        # For api_key providers, show env var name
+        if cfg.get("env"):
+            p["env_var"] = cfg["env"]
+        providers.append(p)
     return {"providers": providers}
 
 @app.get("/api/providers/oauth")
@@ -975,7 +1038,56 @@ async def browser_screenshot(user: dict = Depends(get_current_user)):
     output = result.get("output","")
     return {"status": "attempted", "log": output[:300]}
 
-# ── Sandbox MCPs (installed in user's ~/.bapx/) ──
+# ── Skills API (default Hermes-compatible skills) ──
+SKILLS_DATA = None
+
+def _load_skills():
+    global SKILLS_DATA
+    if SKILLS_DATA:
+        return SKILLS_DATA
+    import json as _json
+    skills_path = Path(__file__).parent / "data" / "skills.json"
+    if skills_path.exists():
+        SKILLS_DATA = _json.loads(skills_path.read_text())
+    else:
+        SKILLS_DATA = {}
+    return SKILLS_DATA
+
+@app.get("/api/skills")
+async def list_skills(user: dict = Depends(get_current_user)):
+    """List all available built-in skills (from Hermes default set)."""
+    skills = _load_skills()
+    return {"skills": skills, "count": len(skills)}
+
+@app.get("/api/skills/{skill_name}")
+async def get_skill(skill_name: str, user: dict = Depends(get_current_user)):
+    """Get a specific skill's content."""
+    skills = _load_skills()
+    skill = skills.get(skill_name)
+    if not skill:
+        raise HTTPException(404, f"Skill '{skill_name}' not found")
+    return {"skill": skill}
+
+@app.post("/api/sandbox/install-skill")
+async def install_skill(req: Request, user: dict = Depends(get_current_user)):
+    """Install a skill into the user's sandbox ~/.bapx/skills/"""
+    body = await req.json()
+    name = body.get("name", "").replace("/", "").replace("..", "")
+    content = body.get("content", "")
+    if not name or not content:
+        raise HTTPException(400, "name and content required")
+    safe = content.replace("'", "'\\''")
+    await exec_in_sandbox(user["id"],
+        f"mkdir -p ~/.bapx/skills && cat > ~/.bapx/skills/{name}.md << 'BAPXEOF'\n{content}\nBAPXEOF")
+    return {"status": "ok", "skill": name}
+
+@app.get("/api/sandbox/skills")
+async def list_installed_skills(user: dict = Depends(get_current_user)):
+    """List skills installed in the user's sandbox."""
+    result = await exec_in_sandbox(user["id"],
+        'ls ~/.bapx/skills/*.md 2>/dev/null | xargs -I{} basename {} .md || echo ""')
+    skills = [s.strip() for s in result.get("output", "").split("\n") if s.strip()]
+    return {"skills": skills, "count": len(skills)}
 @app.post("/api/sandbox/install-mcp")
 async def sandbox_install_mcp(req: Request, user: dict = Depends(get_current_user)):
     """Install an MCP configuration into ~/.bapx/mcps/"""
