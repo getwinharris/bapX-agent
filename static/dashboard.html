@@ -688,11 +688,24 @@ async function loadProviders(){
   }
 }
 
-function updateModels(){
+async function updateModels(){
   var sel = document.getElementById('provider-select');
   var modelSel = document.getElementById('model-select');
+  var keyInput = document.getElementById('api-key-input');
   var prov = (allProviders.api_key || []).find(function(p){ return p.id === sel.value });
   modelSel.innerHTML = '<option value="">Select model...</option>';
+
+  // First try cached models from user profile
+  if(currentUser && currentUser.cached_models && currentUser.cached_models.length > 0 && currentUser.provider === sel.value){
+    currentUser.cached_models.forEach(function(m){
+      var o = document.createElement('option');
+      o.value = m; o.textContent = m;
+      modelSel.appendChild(o);
+    });
+    return;
+  }
+
+  // Fallback to hardcoded provider models
   if(prov && prov.models){
     prov.models.forEach(function(m){
       var o = document.createElement('option');
@@ -708,13 +721,33 @@ async function saveApiKey(){
   var key = document.getElementById('api-key-input').value;
   var err = document.getElementById('apikey-error');
   var succ = document.getElementById('apikey-success');
-  if(!provider||!model||!key){ err.textContent='Fill all fields'; err.style.display='block'; succ.style.display='none'; return }
+  if(!provider||!key){ err.textContent='Select a provider and enter your API key'; err.style.display='block'; succ.style.display='none'; return }
   try{
-    await api('PUT','/api/user/api-key',{provider,key,model});
+    // First save the API key (without model - we'll fetch models live)
+    await api('PUT','/api/user/api-key',{provider,key,model: model || ''});
     err.style.display='none';
-    succ.textContent='API key saved successfully!';
+    succ.innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;margin-right:6px"></span> Connected! Fetching available models...';
     succ.style.display='block';
-    setTimeout(function(){ succ.style.display='none' }, 3000);
+
+    // Now fetch models dynamically from the provider
+    var modelsResp = await api('POST','/api/providers/fetch-models',{provider,key});
+    var fetchedModels = modelsResp.models || [];
+
+    // Update model dropdown with live data
+    var modelSel = document.getElementById('model-select');
+    modelSel.innerHTML = '<option value="">Select model...</option>';
+    fetchedModels.forEach(function(m){
+      var o = document.createElement('option');
+      o.value = m; o.textContent = m;
+      modelSel.appendChild(o);
+    });
+
+    if(modelsResp.source === 'live'){
+      succ.textContent = 'Connected! ' + fetchedModels.length + ' models loaded from provider. Select one.';
+    } else {
+      succ.textContent = 'Connected! Using default model list (live fetch unavailable).';
+    }
+
     var data = await api('GET','/api/user/profile');
     currentUser = data;
     updateConnectionDisplay();

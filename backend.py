@@ -65,6 +65,16 @@ try:
     conn.execute("ALTER TABLE users ADD COLUMN sandbox_id TEXT DEFAULT ''")
 except Exception:
     pass
+# Add cached_models column for dynamic model fetching
+try:
+    conn.execute("ALTER TABLE users ADD COLUMN cached_models TEXT DEFAULT '[]'")
+except Exception:
+    pass
+# Add projects column for user projects
+try:
+    conn.execute("ALTER TABLE users ADD COLUMN projects TEXT DEFAULT '[]'")
+except Exception:
+    pass
 conn.commit()
 for col_sql in [
     "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
@@ -506,6 +516,7 @@ async def user_profile(user: dict = Depends(get_current_user)):
         "oauth_tokens": {k: "••••" + v[-4:] if len(v) > 8 else "••••" for k, v in oauth_tokens.items()},
         "skills_enabled": skills_enabled,
         "sandbox_status": sandbox_status.get("status", "none"),
+        "cached_models": json.loads(user["cached_models"]) if user.get("cached_models") else [],
     }
 
 @app.put("/api/user/profile")
@@ -525,6 +536,78 @@ def update_profile(req: ProfileUpdate, user: dict = Depends(get_current_user)):
     return {"status": "ok"}
 
 # ── API Key Auth ──
+@app.post("/api/providers/fetch-models")
+async def fetch_models_from_provider(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
+    """Fetch available models from a live provider API, given a valid API key."""
+    provider = req.provider or user.get("provider", "openai")
+    api_key = req.key or user.get("api_key", "")
+    if not api_key:
+        raise HTTPException(400, "No API key provided")
+    prov_info = ALL_PROVIDERS.get(provider, {})
+    base_url = prov_info.get("base_url", "")
+    if not base_url:
+        raise HTTPException(400, f"Unknown base URL for provider: {provider}")
+
+    models_url = base_url.rstrip("/")
+    if provider == "anthropic":
+        models_url += "/v1/models"
+        headers = {"x-api-key": api_key, "Content-Type": "application/json"}
+    elif provider == "google":
+        models_url += "/models"
+        headers = {"Content-Type": "application/json"}
+    elif provider == "perplexity":
+        for suffix in ["/models", "/v1/models"]:
+            try:
+                async with httpx.AsyncClient(timeout=10) as c:
+                    r = await c.get(base_url.rstrip("/") + suffix, headers={"Authorization": f"Bearer {api_key}"})
+                    if r.status_code < 400:
+                        models_url = base_url.rstrip("/") + suffix
+                        break
+            except: pass
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    else:
+        if not models_url.endswith("/v1"):
+            models_url += "/v1"
+        models_url += "/models"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+    # For OpenRouter, add required headers
+    if provider == "openrouter":
+        headers["HTTP-Referer"] = "https://bapx.in"
+        headers["X-Title"] = "bapX"
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(models_url, headers=headers)
+            if resp.status_code >= 400:
+                # Fallback to hardcoded models
+                return {"models": prov_info.get("models", []), "source": "fallback"}
+            data = resp.json()
+    except Exception:
+        return {"models": prov_info.get("models", []), "source": "fallback"}
+
+    # Parse models from response
+    model_list = []
+    if "data" in data and isinstance(data["data"], list):
+        for m in data["data"]:
+            mid = m.get("id") or m.get("name") or ""
+            if mid:
+                model_list.append(mid)
+    elif "models" in data and isinstance(data["models"], list):
+        for m in data["models"]:
+            mid = m.get("id") or m.get("name") or ""
+            if mid:
+                model_list.append(mid)
+
+    if not model_list:
+        model_list = prov_info.get("models", [])
+
+    # Cache the fetched models
+    conn.execute("UPDATE users SET cached_models = ? WHERE id = ?", (json.dumps(model_list), user["id"]))
+    conn.commit()
+
+    return {"models": model_list, "source": "live"}
+
 @app.put("/api/user/api-key")
 def update_api_key(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
     updates = []
