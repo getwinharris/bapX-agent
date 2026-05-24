@@ -1,7 +1,6 @@
 """
 bapX Backend — Python FastAPI
-All Hermes model auth methods (API key + OAuth login for ChatGPT/Claude/Grok/Gemini/etc.)
-All default skills from Hermes
+Model connections: API key providers (OpenAI, Anthropic, Google, etc.) + OAuth device flow.
 """
 import os, uuid, json, sqlite3, hashlib, hmac, time, httpx, asyncio, tempfile
 from pathlib import Path
@@ -31,9 +30,9 @@ JWT_ALGO = "HS256"
 JWT_EXPIRY_HOURS = 72
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
-SKILLS_DIR = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))) / "skills"
 DATA_DIR = Path(os.environ.get("BAPX_DATA_DIR", str(BASE_DIR / "data")))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+SKILLS_DIR = DATA_DIR / "skills"
+SKILLS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── DB ──
 conn = sqlite3.connect(str(DATA_DIR / "bapx.db"), check_same_thread=False, timeout=10)
@@ -239,7 +238,7 @@ class AdminActionResp(BaseModel):
     status: str
     message: str = ""
 
-# ── ALL providers (matching Hermes) ──
+# ── ALL providers ──
 ALL_PROVIDERS = {
     # API Key providers
     "openai":     {"name": "OpenAI",          "auth": "api_key", "models": ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo","o1","o1-mini","o3-mini"], "base_url": "https://api.openai.com/v1"},
@@ -310,7 +309,7 @@ OAUTH_CONFIGS = {
 
 # ── Skills loader ──
 def load_default_skills() -> list[dict]:
-    """Load all SKILL.md files from Hermes skills directory."""
+    """Load all SKILL.md files from bapX skills directory (user-created)."""
     skills = []
     if not SKILLS_DIR.exists():
         return skills
@@ -636,7 +635,7 @@ def oauth_status(user: dict = Depends(get_current_user)):
 # ── Skills ──
 @app.get("/api/skills")
 def list_skills():
-    """Return ALL default skills from Hermes."""
+    """Return ALL default skills (user-created)."""
     return {"skills": get_default_skills()}
 
 @app.get("/api/user/skills")

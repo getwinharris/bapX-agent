@@ -1,7 +1,7 @@
 # bapX Admin Panel — Specification
 
 ## Overview
-Admin panel for the CEO (Hermes) to manage bapX platform. Separate from user dashboard. Accessible at `/admin` with super-admin JWT auth.
+Admin panel for the CEO to manage bapX platform. Separate from user dashboard. Accessible at `/admin` with super-admin JWT auth.
 
 ## Architecture
 

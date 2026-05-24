@@ -57,8 +57,8 @@ CREATE TABLE IF NOT EXISTS sandboxes (
 - Pure Python FastAPI — no Node.js
 - OpenSandbox SDK is at `pip show opensandbox` version 0.1.9
 - OpenAI Agents SDK is at `pip show openai-agents` version 0.17.3
-- Codex CLI is at `~/.hermes/node/bin/codex`
-- API key for Codex: `export CODEX_API_KEY=hermes-codex-bridge`
+- Codex CLI for platform is at `/usr/local/bin/bapXcodex`
+- API key for Codex: passed from environment
 - All existing endpoints must keep working
 
 ## Git

@@ -8,7 +8,7 @@ Build the complete bapX agent platform dashboard — pure HTML/CSS/JS, single-pa
 ### 1. Backend (DONE — /root/Dev/bapx/backend.py)
 - [x] User auth (signup/login with JWT)
 - [x] All model providers (API key + OAuth device flow)
-- [x] Skills API (all default Hermes skills)
+- [x] Skills API (all default skills)
 - [x] Chat streaming via SSE
 - [x] Session management
 - [x] Health endpoint

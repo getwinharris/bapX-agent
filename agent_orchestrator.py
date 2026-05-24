@@ -15,9 +15,8 @@ from agents import Agent, Runner, RunConfig, function_tool, WebSearchTool
 from agents.models.multi_provider import MultiProvider
 from openai import AsyncOpenAI
 
-# Codex binary paths — separate CTO (my dev) from platform (user sessions)
-CODEX_CTO_BIN = os.path.expanduser("~/.hermes/node/bin/codex")
-CODEX_PLATFORM_BIN = "/usr/local/bin/bapXcodex"
+# Codex binary — platform agent runtime for user sessions
+CODEX_BIN = "/usr/local/bin/bapXcodex"
 
 # --- Tools ---
 
@@ -27,9 +26,7 @@ def codex_execute(prompt: str) -> str:
     Use this for complex coding, code review, debugging, or file operations.
     The prompt should be a self-contained instruction for Codex.
     """
-    codex_bin = CODEX_CTO_BIN
-    if not os.path.exists(codex_bin):
-        codex_bin = CODEX_PLATFORM_BIN
+    codex_bin = CODEX_BIN
     if not os.path.exists(codex_bin):
         return "Codex CLI not found"
     try:
@@ -38,7 +35,7 @@ def codex_execute(prompt: str) -> str:
             capture_output=True,
             text=True,
             timeout=120,
-            env={**os.environ, "CODEX_API_KEY": "hermes-codex-bridge"},
+            env={**os.environ, "CODEX_API_KEY": os.environ.get("CODEX_API_KEY", "")},
         )
         output = result.stdout + result.stderr
         if result.returncode != 0:

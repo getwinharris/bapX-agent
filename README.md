@@ -6,71 +6,43 @@ Browser-only AI agent platform at bapx.in.
 
 | Layer | Tool | What it does |
 |-------|------|-------------|
-| Backend | Python FastAPI (uvicorn, port 7654) | All API endpoints — auth, providers, chat, skills, memory, sandbox, admin |
+| Backend | Python FastAPI (uvicorn, port 7654) | All API endpoints — auth, providers, chat, memory, sandbox, admin |
 | Frontend | Pure HTML, CSS, JavaScript | No frameworks. Single SPA at `/dashboard.html` |
 | Orchestration | OpenAI Agents SDK | Creates agent per user with web search + tool execution, streams SSE responses |
-| Sandbox | OpenSandbox SDK | Per-user isolated container (not Docker CLI) |
+| Sandbox | OpenSandbox SDK | Per-user isolated container |
 | TTS | KittenTTS | Voice responses in dashboard |
 | Proxy | Caddy | Serves bapx.in, proxies `/api/*` to backend |
-| Database | SQLite | Users, sessions, skills, memory, OAuth tokens, admin data |
+| Database | SQLite | Users, sessions, memory, OAuth tokens, admin data |
 
-## Model Connections (from Hermes internally)
+## Model Connections
 
 1. **API Key** — 17 providers (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, xAI Grok, Groq, Mistral, Together AI, Cohere, Perplexity, Hugging Face, MiniMax, Kimi, Xiaomi, Z.AI GLM, DashScope, StepFun)
 2. **OAuth Device Flow** — ChatGPT (OpenAI), Nous Portal, Qwen (Alibaba), GitHub Copilot
 
-Adapted from Hermes internally. Never credited publicly.
+Users bring their own API key or log in via OAuth with their plan subscription.
 
 ## Skills
 
-- Hermes default skills (102) loaded and browsable in Settings → Skills tab
+- User-created skills from sandbox, browsable and toggleable in Settings → Skills tab
 - Users enable/disable skills per-session
-- Users create custom skills in sandbox
+- Custom MCPs installed via sandbox
 
 ## Mobile
 
-- Left sidebar hidden by default (`width: 0`)
-- Hamburger icon in header — tap to expand
-- Expands over content with backdrop overlay
-- Tap backdrop or hit Escape to close
+Mobile-responsive sidebar: hidden by default (hamburger icon), expands on tap with backdrop overlay, closes on Escape/backdrop tap.
 
-## Pricing
+## Admin
 
-- Storage-based billing
-- No free tier
-- Compute free
-- Anti-abuse monitoring + bans
+Admin panel at `/admin` with:
+- User management (list, ban, unban, delete)
+- Platform stats (users, sessions, signups)
+- Config management (SMTP, billing, OAuth client IDs)
+- Notifications + mail viewer
+- Automation logs
 
-## Architecture
+## Deployment
 
-```
-bapx.in ── Caddy ──► FastAPI :7654
-                       ├── /api/* — REST endpoints
-                       ├── /api/agent/run — OpenAI Agents SDK (SSE)
-                       ├── /api/chat/send — Direct provider chat (SSE)
-                       ├── /api/sandbox/* — OpenSandbox lifecycle
-                       ├── /api/admin/* — Admin panel
-                       ├── /api/tts — KittenTTS voice
-                       ├── /api/memory/* — Cross-session memory
-                       ├── static/dashboard.html — User SPA
-                       ├── static/admin.html — Admin SPA
-                       └── /health — Health check
-```
-
-## Automated Pipeline
-
-| Job | Frequency | What |
-|-----|-----------|------|
-| Git auto-sync | every 10m | Push to GitHub |
-| Server health | every 15m | Check Caddy + backend + disk + memory |
-| Server maintenance | every 30m | Log cleanup, auto-restart |
-| Competitor research | every 6h | Browse Manus.im, Codex.app, ChatGPT |
-
-## Files
-
-- `backend.py` — FastAPI app (~1083 lines)
-- `agent_runtime.py` — OpenAI Agents SDK agent with sandbox_execute tool
-- `sandbox_manager.py` — OpenSandbox per-user lifecycle
-- `static/dashboard.html` — Full SPA (login, signup, chat, settings, skills, sandbox)
-- `static/index.html` — Landing page
-- `data/bapx.db` — SQLite database
+- Backend: `uvicorn backend:app --host 0.0.0.0 --port 7654`
+- Static files mounted at `/` in FastAPI
+- Caddy reverse proxy for bapx.in
+- Data directory: `./data/` (SQLite DB)
