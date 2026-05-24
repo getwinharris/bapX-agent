@@ -35,11 +35,14 @@ async function doLogin() {
   const password = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-error');
   errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email and password required'; errEl.style.display='block'; return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
   try {
     const d = await apiJSON('/api/login', { method:'POST', body:JSON.stringify({email,password}) });
     TOKEN = d.token; localStorage.setItem('bapx_token', TOKEN); USER = d.user;
     initDashboard();
-  } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+  } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; btn.disabled = false; btn.textContent = 'Sign In'; }
 }
 
 async function doSignup() {
@@ -53,12 +56,42 @@ async function doSignup() {
   };
   const errEl = document.getElementById('signup-error');
   errEl.style.display = 'none';
+
+  // Validation
+  if (!body.username || body.username.length < 3) { errEl.textContent='Username must be 3+ characters'; errEl.style.display='block'; return; }
+  if (!body.name) { errEl.textContent='Full name is required'; errEl.style.display='block'; return; }
+  if (!body.email || !body.email.includes('@')) { errEl.textContent='Valid email required'; errEl.style.display='block'; return; }
+  if (!body.password || body.password.length < 8) { errEl.textContent='Password must be 8+ characters'; errEl.style.display='block'; return; }
+  if (!document.getElementById('su-terms').checked) { errEl.textContent='Please agree to the Terms of Service'; errEl.style.display='block'; return; }
+
+  const btn = document.getElementById('signup-btn');
+  btn.disabled = true; btn.textContent = 'Creating account...';
   try {
     const d = await apiJSON('/api/signup', { method:'POST', body:JSON.stringify(body) });
     TOKEN = d.token; localStorage.setItem('bapx_token', TOKEN); USER = d.user;
     initDashboard();
-    alert('Verification code sent to your email. Check your inbox.');
-  } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+  } catch(e) {
+    errEl.textContent=e.message; errEl.style.display='block';
+    btn.disabled = false; btn.textContent = 'Create Account';
+  }
+}
+
+function checkPasswordStrength() {
+  const pw = document.getElementById('su-pass').value;
+  const bar = document.getElementById('pw-bar');
+  const label = document.getElementById('pw-strength-label');
+  let strength = 0;
+  if (pw.length >= 8) strength++;
+  if (pw.length >= 12) strength++;
+  if (/[A-Z]/.test(pw)) strength++;
+  if (/[0-9]/.test(pw)) strength++;
+  if (/[^A-Za-z0-9]/.test(pw)) strength++;
+  bar.className = 'pw-bar';
+  if (pw.length === 0) { bar.style.width = '0'; label.textContent = ''; return; }
+  if (strength <= 1) { bar.classList.add('weak'); label.textContent = 'Weak'; }
+  else if (strength <= 2) { bar.classList.add('fair'); label.textContent = 'Fair'; }
+  else if (strength <= 3) { bar.classList.add('good'); label.textContent = 'Good'; }
+  else { bar.classList.add('strong'); label.textContent = 'Strong'; }
 }
 
 function googleSignup() {}

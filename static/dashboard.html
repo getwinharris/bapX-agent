@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>bapX</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Baskerville:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="dashboard.css">
 <link rel="stylesheet" href="tour.css">
 </head>
@@ -12,38 +12,57 @@
 <div id="app">
   <!-- LOGIN -->
   <div id="page-login" class="auth-page">
-    <div class="auth-logo">bapX</div>
-    <div class="auth-card">
-      <h1>Welcome <span>back</span></h1>
-      <p class="auth-subtitle">Sign in to your account</p>
-      <div class="field"><label>Email</label><input id="login-email" type="email" placeholder="you@email.com" autocomplete="email"></div>
-      <div class="field"><label>Password</label><input id="login-pass" type="password" placeholder="password" autocomplete="current-password"></div>
-      <button class="btn btn-block" onclick="doLogin()">Sign In</button>
-      <div class="msg error" id="login-error"></div>
-      <div class="auth-footer">Don't have an account? <a href="#" onclick="return showPage('signup')">Sign Up</a></div>
+    <div class="auth-container">
+      <div class="auth-logo">bapX</div>
+      <div class="auth-card">
+        <h1 class="auth-heading">Welcome <span>back</span></h1>
+        <p class="auth-subtitle">Sign in to your account</p>
+        <div class="field"><label>Email</label><input id="login-email" type="email" placeholder="you@email.com" autocomplete="email"></div>
+        <div class="field"><label>Password</label><input id="login-pass" type="password" placeholder="Enter your password" autocomplete="current-password"></div>
+        <button class="btn btn-block" onclick="doLogin()" id="login-btn">Sign In</button>
+        <div class="msg error" id="login-error"></div>
+        <div class="auth-footer">Don't have an account? <a href="#" onclick="return showPage('signup')">Sign Up</a> · <a href="#" onclick="showForgotPassword()">Forgot?</a></div>
+      </div>
     </div>
   </div>
 
   <!-- SIGNUP -->
   <div id="page-signup" class="auth-page hidden">
-    <div class="auth-logo">bapX</div>
-    <div class="auth-card">
-      <h1>Create <span>account</span></h1>
-      <p class="auth-subtitle">Join bapX</p>
-      <button class="btn btn-block btn-google" onclick="googleSignup()">
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
-        Sign up with Google
-      </button>
-      <div class="divider"><span>or email</span></div>
-      <div class="field"><label>Username</label><input id="su-username" placeholder="yourname" autocomplete="username"></div>
-      <div class="field"><label>Full Name</label><input id="su-name" placeholder="Your Name" autocomplete="name"></div>
-      <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@email.com" autocomplete="email"></div>
-      <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="8+ characters" autocomplete="new-password"></div>
-      <div class="field"><label>Age</label><input id="su-age" placeholder="Optional"></div>
-      <div class="field"><label>Bio</label><textarea id="su-bio" placeholder="Optional" rows="2"></textarea></div>
-      <button class="btn btn-block" onclick="doSignup()">Create Account</button>
-      <div class="msg error" id="signup-error"></div>
-      <div class="auth-footer">Already have an account? <a href="#" onclick="return showPage('login')">Sign In</a></div>
+    <div class="auth-container">
+      <div class="auth-logo">bapX</div>
+      <div class="auth-card auth-card-wide">
+        <h1 class="auth-heading">Create <span>account</span></h1>
+        <p class="auth-subtitle">Join bapX and start building with AI</p>
+        <button class="btn btn-block btn-social" onclick="googleSignup()" id="google-btn">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+          Sign up with Google
+        </button>
+        <div class="divider"><span>or email</span></div>
+        <div class="form-row">
+          <div class="field"><label>Username</label><input id="su-username" placeholder="yourname" autocomplete="username"></div>
+          <div class="field"><label>Full Name</label><input id="su-name" placeholder="Your Name" autocomplete="name"></div>
+        </div>
+        <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@email.com" autocomplete="email"></div>
+        <div class="field">
+          <label>Password</label>
+          <input id="su-pass" type="password" placeholder="Create a strong password" autocomplete="new-password" oninput="checkPasswordStrength()">
+          <div class="pw-strength" id="pw-strength"><div class="pw-bar" id="pw-bar"></div></div>
+          <div class="pw-strength-label" id="pw-strength-label"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Age</label><input id="su-age" placeholder="Optional"></div>
+          <div class="field"><label>Agent Name</label><input id="su-agent-name" placeholder="My AI Agent"></div>
+        </div>
+        <div class="field"><label>Bio / What will you use bapX for?</label><textarea id="su-bio" placeholder="e.g., Building websites, research, coding..." rows="2"></textarea></div>
+        <label class="checkbox-wrap">
+          <input type="checkbox" id="su-terms">
+          <span class="checkbox-mark"></span>
+          I agree to the <a href="#" onclick="alert('Terms of Service')">Terms of Service</a> and <a href="#" onclick="alert('Privacy Policy')">Privacy Policy</a>
+        </label>
+        <button class="btn btn-block" onclick="doSignup()" id="signup-btn">Create Account</button>
+        <div class="msg error" id="signup-error"></div>
+        <div class="auth-footer">Already have an account? <a href="#" onclick="return showPage('login')">Sign In</a></div>
+      </div>
     </div>
   </div>
 
