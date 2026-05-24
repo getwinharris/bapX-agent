@@ -1163,7 +1163,6 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
 
-  // Check for slash command
   if (text.startsWith('/')) {
     handleSlashCommand(text);
     input.value = '';
@@ -1177,8 +1176,19 @@ async function sendMessage() {
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
 
+  // Show the right panel if collapsed
+  const rp = document.getElementById('right-panel');
+  if (rp.classList.contains('collapsed') && !rp.classList.contains('open')) {
+    rp.classList.add('open');
+    rp.classList.remove('collapsed');
+    document.querySelector('.rp-tab[data-tab="canvas"]').click();
+  }
+
+  // Add a flow step for the thinking phase
+  const thinkId = addFlowStep('think', 'Thinking', text.slice(0, 80) + '...', 'running');
+
   try {
-    // Use SSE streaming
+    // Try SSE streaming first
     const headers = apiHeaders();
     const resp = await fetch(API + '/api/sandbox/stream', {
       method:'POST',
@@ -1197,8 +1207,9 @@ async function sendMessage() {
     const decoder = new TextDecoder();
     let fullResponse = '';
     let buffer = '';
+    let hasContent = false;
 
-    // Show assistant message bubble (will update)
+    // Show assistant message bubble (will update live)
     const msgDiv = document.createElement('div');
     msgDiv.className = 'chat-msg assistant';
     document.getElementById('chat-messages').appendChild(msgDiv);
@@ -1206,6 +1217,7 @@ async function sendMessage() {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      hasContent = true;
 
       buffer += decoder.decode(value, {stream: true});
       const lines = buffer.split('\n');
@@ -1222,17 +1234,21 @@ async function sendMessage() {
               fullResponse += evt.content;
               msgDiv.textContent = fullResponse;
             } else if (evt.type === 'step') {
+              // Update the current thinking step or add a new one
+              updateTaskStatus(thinkId, 'running');
               addFlowStep(evt.step_type || 'think', evt.title || 'Step', evt.description, 'running');
             } else if (evt.type === 'step_done') {
+              updateTaskStatus(thinkId, 'done');
               addFlowStep(evt.step_type || 'check', evt.title || 'Complete', evt.description, 'done');
             } else if (evt.type === 'command') {
-              addFlowTerm(evt.command, evt.output);
+              addFlowTerm(evt.command, evt.output || '');
             } else if (evt.type === 'diff') {
               addFlowDiff(evt.file, evt.diff);
             } else if (evt.type === 'file') {
               addFlowFile(evt.file, evt.action);
             } else if (evt.type === 'error') {
               addFlowError(evt.message);
+              updateTaskStatus(thinkId, 'error');
             } else if (evt.type === 'session') {
               CHAT_SESSION_ID = evt.session_id;
             }
@@ -1248,16 +1264,46 @@ async function sendMessage() {
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    // Final message
-    if (fullResponse) {
+    if (!hasContent || (!fullResponse && !CHAT_HISTORY.length)) {
+      // Stream had no content - fall back to non-streaming
+      removeTypingIndicator();
+      msgDiv.remove();
+      const fallback = await apiJSON('/api/sandbox/exec', {
+        method:'POST', body:JSON.stringify({
+          command: `cd ~ && echo '${text.replace(/'/g, "'\\''")}' | bapX exec --timeout 120 2>/dev/null || echo 'Agent not available in sandbox'`,
+          language: 'bash'
+        })
+      });
+      const response = fallback.output || 'No response from agent';
+      CHAT_HISTORY.push({role:'assistant', content:response});
+      addMessage(response, 'assistant');
+      updateTaskStatus(thinkId, 'done');
+      addFlowStep('check', 'Complete', 'Response received', 'done');
+    } else if (fullResponse) {
       CHAT_HISTORY.push({role:'assistant', content:fullResponse});
+      updateTaskStatus(thinkId, 'done');
     }
-    setSandboxStatus('idle');
 
   } catch(e) {
     removeTypingIndicator();
-    addMessage(`Error: ${e.message}`, 'assistant');
-    addFlowError(e.message);
+    // Fall back to non-streaming exec
+    try {
+      const fallback = await apiJSON('/api/sandbox/exec', {
+        method:'POST', body:JSON.stringify({
+          command: `cd ~ && echo '${text.replace(/'/g, "'\\''")}' | bapX exec --timeout 120 2>/dev/null || echo 'Agent not available'`,
+          language: 'bash'
+        })
+      });
+      const response = fallback.output || 'No response from agent';
+      CHAT_HISTORY.push({role:'assistant', content:response});
+      addMessage(response, 'assistant');
+      updateTaskStatus(thinkId, 'done');
+      addFlowStep('check', 'Complete', 'Response received', 'done');
+    } catch(e2) {
+      addMessage(`Error: ${e2.message}`, 'assistant');
+      addFlowError(e2.message);
+      updateTaskStatus(thinkId, 'error');
+    }
   }
   sendBtn.disabled = false;
 }

@@ -20,6 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from opensandbox import Sandbox
 from opensandbox.config.connection import ConnectionConfig
+from opensandbox.services.command import ExecutionHandlers
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
@@ -1491,49 +1492,95 @@ class StreamReq(BaseModel):
 
 @app.post("/api/sandbox/stream")
 async def sandbox_stream(req: StreamReq, user: dict = Depends(get_current_user)):
-    """Stream agent response from sandbox bapX via SSE."""
+    """Stream agent response from sandbox via SSE — real-time Manus-style flow."""
     async def event_stream():
         # Send session event
         yield f"data: {json.dumps({'type':'session','session_id':user['id']})}\n\n"
-        
-        # Send step event
-        yield f"data: {json.dumps({'type':'step','step_type':'think','title':'Processing','description':req.message[:100]})}\n\n"
-        
+
+        # Ensure sandbox is running
+        sb_exists = await get_sandbox_status(user["id"])
+        if not sb_exists or sb_exists.get("status") not in ("running",):
+            yield f"data: {json.dumps({'type':'step','step_type':'think','title':'Starting sandbox...','status':'running'})}\n\n"
+            result = await start_sandbox(user["id"], user["username"])
+            if result and result.get("sandbox_id"):
+                conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (result["sandbox_id"], user["id"]))
+                conn.commit()
+
+        yield f"data: {json.dumps({'type':'step','step_type':'think','title':'Processing','description':req.message[:200],'status':'running'})}\n\n"
+
         try:
-            # Ensure sandbox is running
-            sb_exists = await get_sandbox_status(user["id"])
-            if not sb_exists or sb_exists.get("status") not in ("running",):
-                result = await start_sandbox(user["id"], user["username"])
-                if result and result.get("sandbox_id"):
-                    conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (result["sandbox_id"], user["id"]))
-                    conn.commit()
-                    yield f"data: {json.dumps({'type':'step','step_type':'think','title':'Starting sandbox...'})}\n\n"
-            
-            # Execute in sandbox
+            sid = _sb_cache.get(user["id"])
+            if not sid:
+                yield f"data: {json.dumps({'type':'error','message':'No sandbox'})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            sb = await Sandbox.connect(sid, _sb_conn())
             escaped = req.message.replace("'", "'\\''")
-            result = await exec_in_sandbox(user["id"],
-                f"cd ~ && echo '{escaped}' | bapX exec --timeout 120 2>/dev/null")
-            
-            output = result.get("output", "") or ""
-            error = result.get("error", "")
-            
-            if error:
-                yield f"data: {json.dumps({'type':'error','message':error[:500]})}\n\n"
-                yield f"data: {json.dumps({'type':'step_done','step_type':'error','title':'Error','description':error[:200]})}\n\n"
-            else:
-                # Send text events in chunks
-                chunk_size = 500
-                for i in range(0, len(output), chunk_size):
-                    chunk = output[i:i+chunk_size]
-                    yield f"data: {json.dumps({'type':'text','content':chunk})}\n\n"
-                    await asyncio.sleep(0.01)
-                
-                yield f"data: {json.dumps({'type':'step_done','step_type':'check','title':'Complete'})}\n\n"
+
+            # Use a queue to bridge streaming handlers → SSE yields
+            queue: asyncio.Queue = asyncio.Queue()
+
+            def _emit(typ: str, **data):
+                """Put an SSE event on the queue."""
+                evt = {"type": typ, **data}
+                queue.put_nowait(json.dumps(evt))
+
+            async def on_stdout(text: str):
+                _emit("text", content=text)
+                # Parse tool usage markers
+                for line in text.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if line.startswith('▸') or line.startswith('$ '):
+                        _emit("command", command=line.replace('▸','').replace('$','').strip(), output='')
+                    elif line.startswith('📄') or line.startswith('  → '):
+                        _emit("file", file=line.replace('📄','').strip(), action='modified')
+                    elif line.startswith('💭') or line.startswith('● Thinking'):
+                        _emit("step", step_type="think", title="Thinking", description=line.replace('💭','').replace('● Thinking','').strip(), status="running")
+                    elif line.startswith('✓') or line.startswith('✅'):
+                        _emit("step_done", step_type="check", title="Complete", description=line.replace('✓','').replace('✅','').strip())
+
+            async def on_stderr(text: str):
+                _emit("text", content=text)
+
+            async def on_error(err):
+                _emit("error", message=str(err)[:500])
+
+            async def on_execution_complete(result):
+                _emit("step_done", step_type="check", title="Complete", description="")
+
+            # Start command with streaming handlers
+            run_task = asyncio.create_task(sb.commands.run(
+                f"cd ~ && echo '{escaped}' | bapX exec --timeout 120 2>/dev/null || echo 'Agent not available'",
+                handlers=ExecutionHandlers(
+                    on_stdout=on_stdout,
+                    on_stderr=on_stderr,
+                    on_execution_complete=on_execution_complete,
+                    on_error=on_error,
+                )
+            ))
+
+            # Forward queue events to SSE until done
+            while not run_task.done() or not queue.empty():
+                try:
+                    evt_json = await asyncio.wait_for(queue.get(), timeout=0.5)
+                    yield f"data: {evt_json}\n\n"
+                except asyncio.TimeoutError:
+                    continue
+
+            # Check for errors
+            try:
+                await run_task
+            except Exception as e:
+                yield f"data: {json.dumps({'type':'error','message':str(e)[:500]})}\n\n"
+
         except Exception as e:
             yield f"data: {json.dumps({'type':'error','message':str(e)[:500]})}\n\n"
-        
+
         yield "data: [DONE]\n\n"
-    
+
     return StreamingResponse(event_stream(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
