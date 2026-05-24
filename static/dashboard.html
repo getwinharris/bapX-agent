@@ -476,8 +476,8 @@ async function api(method, path, body){
     showPage('login');
     throw new Error('Session expired');
   }
-  // SSE endpoint returns raw response
-  if(path === '/api/chat/send') return res;
+  // SSE endpoints return raw response
+  if(path === '/api/chat/send' || path === '/api/agent/run') return res;
   const data = await res.json();
   if(!res.ok) throw new Error(data.detail || 'Request failed');
   return data;

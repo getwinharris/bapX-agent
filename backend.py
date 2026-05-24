@@ -17,6 +17,8 @@ import jwt
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from agent_runtime import stream_agent_response
+from sandbox_manager import start_sandbox, stop_sandbox, get_sandbox_status, exec_in_sandbox
 
 # ── Config ──
 JWT_SECRET: str = os.environ.get("BAPX_JWT_SECRET", "")
@@ -125,6 +127,17 @@ class MemorySave(BaseModel):
     key: str
     value: str
     session_id: str = ""
+
+class AgentRunReq(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+class SandboxStartReq(BaseModel):
+    pass
+
+class SandboxExecReq(BaseModel):
+    command: str
+    language: str = "bash"
 
 # ── ALL providers (matching Hermes) ──
 ALL_PROVIDERS = {
@@ -315,7 +328,7 @@ def list_providers():
 
 # ── User Settings ──
 @app.get("/api/user/profile")
-def user_profile(user: dict = Depends(get_current_user)):
+async def user_profile(user: dict = Depends(get_current_user)):
     key = user["api_key"]
     try:
         oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
@@ -325,6 +338,8 @@ def user_profile(user: dict = Depends(get_current_user)):
         skills_enabled = json.loads(user["skills_enabled"]) if user["skills_enabled"] else []
     except Exception:
         skills_enabled = []
+    # Check sandbox status
+    sandbox_status = await get_sandbox_status(user["id"])
     return {
         "id": user["id"], "username": user["username"],
         "name": user["name"], "email": user["email"],
@@ -336,6 +351,7 @@ def user_profile(user: dict = Depends(get_current_user)):
         "model": user["model"],
         "oauth_tokens": {k: "••••" + v[-4:] if len(v) > 8 else "••••" for k, v in oauth_tokens.items()},
         "skills_enabled": skills_enabled,
+        "sandbox_status": sandbox_status.get("status", "none"),
     }
 
 @app.put("/api/user/profile")
@@ -623,6 +639,52 @@ async def chat_send(req: ChatSend, user: dict = Depends(get_current_user)):
     return StreamingResponse(stream(), media_type="text/event-stream",
         headers={"X-Session-Id": sid})
 
+# ── Agent Runtime (OpenAI Agents SDK) ──
+@app.post("/api/agent/run")
+async def agent_run(req: AgentRunReq, user: dict = Depends(get_current_user)):
+    """Run user message through OpenAI Agents SDK with full tool access."""
+    # Load session history
+    sid = req.session_id or uuid.uuid4().hex
+    if not req.session_id:
+        conn.execute("INSERT INTO sessions (id, user_id) VALUES (?, ?)", (sid, user["id"]))
+        conn.commit()
+
+    session = conn.execute("SELECT messages FROM sessions WHERE id = ? AND user_id = ?",
+                          (sid, user["id"])).fetchone()
+    messages = json.loads(session["messages"]) if session else []
+    messages.append({"role": "user", "content": req.message})
+
+    # Load user's enabled skills
+    try:
+        enabled_skill_names = json.loads(user["skills_enabled"]) if user["skills_enabled"] else []
+    except Exception:
+        enabled_skill_names = []
+    all_skills = get_default_skills()
+    enabled_skills = [s for s in all_skills if s["name"] in enabled_skill_names]
+
+    async def stream():
+        full_response = ""
+        async for chunk in stream_agent_response(user, messages, enabled_skills):
+            yield chunk
+            try:
+                prefix = "data: "
+                if chunk.startswith(prefix):
+                    data = json.loads(chunk[len(prefix):])
+                    if "text" in data:
+                        full_response += data["text"]
+            except (json.JSONDecodeError, IndexError):
+                pass
+
+        # Save response
+        if full_response:
+            messages.append({"role": "assistant", "content": full_response})
+            conn.execute("UPDATE sessions SET messages = ? WHERE id = ?",
+                        (json.dumps(messages), sid))
+            conn.commit()
+
+    return StreamingResponse(stream(), media_type="text/event-stream",
+        headers={"X-Session-Id": sid})
+
 # ── Sessions ──
 @app.get("/api/sessions")
 def list_sessions(user: dict = Depends(get_current_user)):
@@ -701,6 +763,37 @@ def memory_get(session_id: str = "", user: dict = Depends(get_current_user)):
             (user["id"],),
         ).fetchall()
     return {"memories": [dict(r) for r in rows]}
+
+# ── Sandbox ──
+@app.post("/api/sandbox/start")
+async def sandbox_start(user: dict = Depends(get_current_user)):
+    """Start a sandbox for the current user."""
+    result = await start_sandbox(user["id"], user["username"])
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+@app.post("/api/sandbox/stop")
+async def sandbox_stop(user: dict = Depends(get_current_user)):
+    """Stop the current user's sandbox."""
+    result = await stop_sandbox(user["id"])
+    if "error" in result and not result.get("deleted"):
+        raise HTTPException(400, result["error"])
+    return result
+
+@app.get("/api/sandbox/status")
+async def sandbox_status_endpoint(user: dict = Depends(get_current_user)):
+    """Get sandbox status for the current user."""
+    result = await get_sandbox_status(user["id"])
+    return result
+
+@app.post("/api/sandbox/exec")
+async def sandbox_exec(req: SandboxExecReq, user: dict = Depends(get_current_user)):
+    """Execute a command in the user's sandbox."""
+    result = await exec_in_sandbox(user["id"], req.command, req.language)
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
 
 # ── Health ──
 @app.get("/health")
