@@ -48,7 +48,7 @@ conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(sessio
 conn.commit()
 
 # ── FastAPI App ──
-app = FastAPI(title="bapX API", version="1.0.0")
+app = FastAPI(title="bapX API", version="0.2.0")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
