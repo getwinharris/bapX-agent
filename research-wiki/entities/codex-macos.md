@@ -1,196 +1,393 @@
 ---
-title: Codex macOS App Analysis
+title: Codex macOS Desktop App Architecture
 type: entity
 status: final
 created: 2026-05-24
 updated: 2026-05-24
 author: bapX Research
-tags: [ui-analysis, codex, platform, desktop-app]
-cross-refs: [design-system-codex, manus-vs-codex-ui, manus-vs-codex-onboarding, layout-comparison, onboarding-flow]
+tags: [ui-analysis, codex, platform, desktop-app, protocol, architecture]
+cross-refs: [codex-desktop-app-protocol, design-system-codex, manus-vs-codex-ui, layout-comparison]
 ---
 
-# Codex macOS App Analysis
+# Codex macOS Desktop App Architecture
 
-> Based on OpenAI Codex SDK documentation, desktop app references, and implementation patterns.
-> Codex is OpenAI's open-source agent runtime with a macOS desktop client.
+> Extracted from the actual app-server protocol source code, desktop app launcher, and daemon lifecycle management.
+> Source code examined: `/root/Dev/codex/codex-rs/` — `desktop_app/`, `app-server-protocol/`, `app-server-client/`, `app-server-daemon/`, `login/src/assets/`
 
 ---
 
 ## 1. Product Context
 
-- **Product**: Codex — open-source agent runtime and desktop application
+- **Product**: Codex — OpenAI's open-source agent runtime
 - **Developer**: OpenAI
-- **Interface**: macOS native desktop application (AppKit/SwiftUI)
-- **Positioning**: Agent runtime for developers — CLI-first with desktop GUI companion
+- **Interface**: macOS native desktop application (.app bundle) + CLI orchestrator
+- **Positioning**: Agent runtime for developers — desktop GUI companion with daemon-managed backend
 - **Target audience**: Developers, engineers, technical users
-- **Architecture**: Rust-based runtime + Session protocol + Tool system
+- **Architecture**: Native app (SwiftUI/native) + Rust backend (app-server) + daemon + JSON-RPC protocol
 
-## 2. Visual Identity
+---
 
-### 2.1 Theme
-- **Dark theme dominant**: Dark backgrounds (#1a1a1a to #2a2a2e range) with light text
-- **Text color**: White/light gray (#e8e8f0 range) for readability on dark
-- **Accent color**: Blue (#0081f2) — same as Manus.im — or purple range in some variants
-- **Minimal chrome**: Thin borders, subtle separators, focus on content
-- **Developer-oriented**: Clean, utilitarian aesthetic with minimal decoration
-
-### 2.2 Typography Philosophy
-- **System-optimal**: Inter font family (open-source, designed for screens) or Apple system fonts (San Francisco)
-- **Code-optimized**: Monospace font (SF Mono, JetBrains Mono, or cascadia code) for terminal output and code snippets
-- **Compact UI**: Smaller font sizes (13-15px range) for dense information display
-- **Readable chat**: Larger body text (15-16px) for conversation messages
-
-## 3. Layout Architecture
-
-### 3.1 Three-Column Layout (Core)
+## 2. Architecture Overview
 
 ```
-┌─────────────┬──────────────────────┬─────────────────┐
-│  Left       │    Center            │   Right Panel   │
-│  Sidebar    │    (Chat/Main Area)  │   (Flow/Term)   │
-│             │                      │                 │
-│ 48px icon   │  Messages            │ Activity Stream │
-│ rail +      │  / Chat history      │ or Browser      │
-│ expandable  │                      │ or Terminal     │
-│ panel       │  Input at bottom     │ Toggle: show/   │
-│             │                      │ hide            │
-│ User avatar │  Typing indicator    │                 │
-│ at bottom   │                      │                 │
-└─────────────┴──────────────────────┴─────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    macOS Desktop App                         │
+│  Native .app bundle (SwiftUI or native rendering)            │
+│  JSON-RPC 2.0 over WebSocket over Unix Socket               │
+│  Deep link: codex://threads/new                              │
+│  Receives workspace path as launch argument                  │
+├──────────────────────────────────────────────────────────────┤
+│                    codex CLI (launcher)                       │
+│  `codex desktop` downloads DMG, installs, launches           │
+│  Download: persistent.oaistatic.com/codex-app-prod/Codex.dmg │
+│  Install: /Applications/Codex.app or ~/Applications/         │
+│  Launch: `open -a Codex.app <workspace>`                     │
+├──────────────────────────────────────────────────────────────┤
+│              codex-app-server-daemon                         │
+│   Background process, PID-managed, auto-updating             │
+│   Unix socket: $CODEX_HOME/app-server.sock                   │
+│   WebSocket JSON-RPC transport                               │
+│   Remote control endpoint for headless operation             │
+├──────────────────────────────────────────────────────────────┤
+│                app-server (core runtime)                      │
+│   Thread/turn management, agent execution                    │
+│   Tool system (filesystem, terminal, MCP, web search)        │
+│   Approval routing, config management                        │
+│   Session/state management                                   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 Column Details
+### Key Architecture Facts
 
-#### Left Sidebar
-- **Width**: 48px collapsed (icon rail), expands to ~240px when open
-- **Top**: Application logo (OpenAI "o" mark or Codex icon)
-- **Middle**: Navigation items with icons only (collapsed) or labels (expanded):
-  - Chats/Conversations
-  - Sessions
-  - Settings
-  - Tools/Skills
-- **Bottom**: User avatar with status indicator (online/offline)
-- **Behavior**: Hover or click to expand; stays open until dismissed
-- **Divider**: Thin 1px border separating from center column
+1. **The desktop app is a native macOS .app bundle** — not Electron, not web-based, and NOT the TUI
+2. **Signed and notarized** with Apple Developer ID — production-ready distribution
+3. **Entitlement**: `com.apple.security.cs.allow-jit` — allows JIT compilation (suggests SwiftUI or metal-backed rendering)
+4. **Distributed as .dmg** from `https://persistent.oaistatic.com/codex-app-prod/`
+   - ARM64: `Codex.dmg`
+   - Intel: `Codex-latest-x64.dmg`
+5. **Communicates via JSON-RPC 2.0** over WebSocket over Unix socket
+6. **Daemon-managed lifecycle**: Start/stop/restart app-server as background process
+7. **Deep link protocol**: `codex://threads/new`
+8. **Receives workspace path** as command-line argument when launched
+9. **Light mode default** with dark mode via `prefers-color-scheme` (confirmed from login page CSS)
 
-#### Center Column (Chat)
-- **Width**: Flexible (fills remaining space)
-- **Top**: Conversation header (model name, session info)
-- **Middle**: Message list (scrollable):
-  - User messages: right-aligned, accent background bubble
-  - Assistant messages: left-aligned, dark background bubble
-  - Code blocks: monospace on dark background with syntax highlighting
-  - Tool calls: Collapsible with status indicator (✓, ⟳, ✗)
-- **Bottom**: Input area:
-  - Text input with placeholder "Ask anything..."
-  - Send button (accent color)
-  - Optional: file attachment, image upload, voice input
-- **Typing indicator**: Bouncing dots animation (3 dots)
+---
 
-#### Right Panel
-- **Width**: ~320-400px
-- **Toggle**: Show/hide via button in center column header
-- **Three tabs**:
-  1. **Flow** (default): Activity stream showing:
-     - Tool execution logs
-     - File changes (with icon and colored diff)
-     - Session events
-     - Timestamped entries
-  2. **Browser**: CDP-based browser view
-     - Embedded web page rendering
-     - URL bar at top
-     - Navigation controls (back, forward, reload)
-  3. **Terminal**: Shell output
-     - Monospace output on dark background
-     - Command history
-     - Scrollable
+## 3. macOS Desktop App Launcher
 
-## 4. Component Inventory
+### Installation Flow
+1. Check if Codex.app exists at `/Applications/Codex.app` or `~/Applications/Codex.app`
+2. If found, launch with `open -a Codex.app <workspace>`
+3. If not found, download DMG from CDN
+4. Mount DMG with `hdiutil attach -nobrowse -readonly`
+5. Find Codex.app in mounted volume
+6. Copy to `/Applications/` using `ditto`
+7. Detach DMG with `hdiutil detach`
+8. Launch the app
 
-### 4.1 Chat Components
+### Platform Detection
+- Apple Silicon detection via `sysctl.proc_translated` and `hw.optional.arm64` sysctl flags
+- Separate DMG URLs for ARM64 vs x64
 
-| Component | Style | Details |
-|-----------|-------|---------|
-| User bubble | Accent bg (blue/purple), right-aligned | Rounded corners (8-12px), no tail |
-| Assistant bubble | Dark bg (#2a2a2e), left-aligned | Rounded corners (8-12px), no tail |
-| Typing indicator | Bouncing dots animation | 3 dots, accent color |
-| Code block | Monospace, dark bg, syntax highlighted | Header with language label + copy button |
-| Tool call | Collapsible card | Status icon, tool name, duration, args expandable |
-| Divider | Thin, subtle | Between messages or sections |
+---
 
-### 4.2 Input Components
+## 4. Login & Authentication Flow
 
-| Component | Style | Details |
-|-----------|-------|---------|
-| Text input | Rounded, dark bg, light text | Placeholder: "Ask anything..." |
-| Send button | Accent blue icon | Disabled when input empty |
-| Attachment btn | Paperclip icon | File upload trigger |
-| Voice btn | Microphone icon | Voice input (if supported) |
+### 4.1 OAuth Web Flow
+The login crate (`codex-login`) provides the OAuth callback pages:
 
-### 4.3 Panel Components
+1. Desktop app sends `account/login` with one of:
+   - `apiKey` — Direct API key entry
+   - `chatgpt` — ChatGPT OAuth (opens system browser)
+   - `chatgptDeviceCode` — Device code flow (displays code in app)
+   - `chatgptAuthTokens` — Direct token injection (internal use)
 
-| Component | Style | Details |
-|-----------|-------|---------|
-| Flow entry | Icon + text + timestamp | File icon for changes, colored diff lines |
-| Terminal output | Monospace, dark bg, green/white text | ANSI color support |
-| Browser view | Embedded WebView | URL bar, nav controls |
-| Tab bar | Text labels, accent underline active | "Flow" | "Browser" | "Terminal" |
-| Panel toggle | Icon button in center header | Show/hide right panel |
+2. Browser opens to OAuth provider (chat.openai.com)
+3. After auth, browser redirects to local HTTP server
+4. Login HTML pages are served:
 
-### 4.4 Sidebar Components
+#### Success Page (`success.html`)
+- "ChatGPT" wordmark at top-left
+- "You're signed in and may close this tab" message
+- "Open Codex" button with Codex logo SVG
+- Auto-redirects to `codex://threads/new` after 250ms
+- If `needs_setup=true`, shows setup box with countdown to API org setup
+- CSS tokens confirm **light-by-default with dark mode support**
 
-| Component | Style | Details |
-|-----------|-------|---------|
-| Logo | OpenAI "o" or Codex icon | Top of sidebar |
-| Nav icon | Stylized icon, 24x24 | For each nav item |
-| Nav label | Text, visible when expanded | Hidden in collapsed mode |
-| User avatar | Circular, user image or initials | Bottom of sidebar |
-| Status dot | Green/gray dot | Online/offline indicator |
+#### Error Page (`error.html`)
+- "Codex login" branding with logo
+- Error title, message, error code, description, and help text
+- Card layout with shadow, details grid
+- Clean light-only styling
 
-### 4.5 Loading & Progress
+### 4.2 MCP Server OAuth
+- Desktop app sends `mcpServer/oauthLogin` with `{ name, scopes, timeoutSecs }`
+- Server initiates provider's OAuth flow
+- Completion via `mcpServer/oauthLogin/completed` notification
 
-| Component | Style | Details |
-|-----------|-------|---------|
-| Typing indicator | Bouncing dots | In chat area, bottom |
-| Spinner | Circular progress | In tool calls, file operations |
-| Progress bar | Accent color | File uploads, long operations |
-| Skeleton | Gray shimmer | Initial chat load |
+---
 
-## 5. Interaction Patterns
+## 5. UI Protocol — All Interaction Types
 
-### 5.1 Message Flow
-1. User types message in input
-2. Send button activates
-3. User sends (Enter or click)
-4. Message appears as right-aligned bubble
-5. Typing indicator shows (bouncing dots)
-6. Assistant responds with streaming text or complete message
-7. Tool calls appear as collapsible cards
-8. Flow panel updates with activity entries
-9. Terminal panel may show shell commands being executed
+The desktop app is protocol-defined. Every UI interaction maps to a JSON-RPC message.
 
-### 5.2 Panel Management
-- Right panel toggles via button
-- Tabs are persistent within session
-- Terminal maintains shell state across commands
-- Flow entries auto-scroll to latest
-- Browser persists navigation state
+### 5.1 Chat Interface
 
-### 5.3 Sidebar Interaction
-- Click/hover icon rail to expand
-- Click outside or toggle to collapse
-- Active state indicated by highlight/accent
-- Navigation changes center column content
+| Protocol Message | UI Element | Direction |
+|-----------------|------------|-----------|
+| `turn/start` | Send message (user input) | App → Server |
+| `turn/steer` | Edit/supplement running turn | App → Server |
+| `turn/interrupt` | Stop button | App → Server |
+| `agent/message/delta` | Streaming text append in chat bubble | Server → App |
+| `item/started` | Item progress indicator (spinner) | Server → App |
+| `item/completed` | Item completion state (checkmark) | Server → App |
+| `reasoning/textDelta` | Reasoning display panel update | Server → App |
+| `reasoning/summaryTextDelta` | Reasoning summary streaming | Server → App |
+| `plan/delta` | Plan step status changes | Server → App |
+| `turn/completed` | Turn completion state | Server → App |
+| `turn/diff/updated` | Turn diff visible in conversation | Server → App |
 
-## 6. Key Observations
+### 5.2 Terminal Panel
 
-1. **Developer-first dark theme**: Unlike Manus.im's light marketing site, Codex is dark by default — appropriate for developer tools
-2. **Three-column power layout**: Combines navigation (left), conversation (center), and context/activity (right) in one view
-3. **Sidebar as icon rail**: The 48px collapsed sidebar is a common macOS pattern (Finder, Xcode, Notes) — saves space while providing quick access
-4. **Right panel as context canvas**: Flow/Browser/Terminal provide surrounding context without leaving the chat view
-5. **Bubble chat UI**: Familiar messaging pattern with clear sender distinction (user right, assistant left)
-6. **Collapsible tool calls**: Users can inspect or hide technical details — progressive disclosure for agent operations
-7. **CDP-based browser**: Chrome DevTools Protocol integration for live web browsing within the app
-8. **Terminal integration**: Direct shell access alongside chat — bridging conversational and command-line interfaces
-9. **Accent consistency**: Blue (#0081f2) used for interactive elements — same accent as Manus.im
-10. **Rounded corners (8-12px)**: Modern, approachable feel despite dark/developer theme
+| Protocol Message | UI Element | Direction |
+|-----------------|------------|-----------|
+| `command/exec` | Run command in terminal | App → Server |
+| `command/exec/write` | Send stdin input | App → Server |
+| `command/exec/resize` | Resize PTY (cols/rows) | App → Server |
+| `command/exec/terminate` | Kill process | App → Server |
+| `command/exec/outputDelta` | stdout/stderr bytes appended | Server → App |
+| `process/outputDelta` | process/spawn output streaming | Server → App |
+| `process/exited` | Process exit code notification | Server → App |
+
+### 5.3 File System Panel
+
+| Protocol Message | UI Element | Direction |
+|-----------------|------------|-----------|
+| `fs/readFile` | Open file in viewer/editor | App → Server |
+| `fs/writeFile` | Save file | App → Server |
+| `fs/readDirectory` | Browse directory | App → Server |
+| `fs/watch` | Watch file for changes | App → Server |
+| `fs/changed` | File changed notification | Server → App |
+| `fileChange/patch/updated` | Diff preview in flow/chat | Server → App |
+
+### 5.4 Approval Dialogs
+
+| Protocol Message | UI Dialog | Direction |
+|-----------------|-----------|-----------|
+| `commandExecution/requestApproval` | "Allow this command?" dialog | Server → App |
+| `fileChange/requestApproval` | "Allow this file change?" dialog | Server → App |
+| `permissions/requestApproval` | "Grant permissions?" dialog | Server → App |
+| `applyPatch/requestApproval` | "Apply this patch?" dialog | Server → App |
+| `execCommand/requestApproval` | "Execute this command?" dialog | Server → App |
+| `tools/requestUserInput` | Form dialog (text, select, secret) | Server → App |
+| `mcpServerElicitation/request` | Parameter elicitation dialog | Server → App |
+
+### 5.5 Approval Response Types
+Commands can be approved/denied with different scopes:
+- **Accept** — Allow once
+- **Accept for Session** — Allow for this session (cache)
+- **Accept with Policy Amendment** — Allow and update execpolicy to auto-allow future matching commands
+- **Apply Network Policy Amendment** — Create persistent allow/deny rule for a host
+- **Decline** — Deny, continue turn
+- **Cancel** — Deny, interrupt entire turn
+
+### 5.6 Sidebar / Navigation
+
+| Protocol Message | UI Element | Direction |
+|-----------------|------------|-----------|
+| `apps/list` | App/connector sidebar | App → Server |
+| `appList/updated` | App list refresh | Server → App |
+| `thread/list` | Thread conversation list | App → Server |
+| `thread/loadedList` | Loaded threads | App → Server |
+| `thread/name/updated` | Thread rename | Server → App |
+| `thread/status/changed` | Thread status icon update | Server → App |
+| `thread/archived` | Thread removed from list | Server → App |
+| `skills/list` | Skills/plugins browser | App → Server |
+| `skills/changed` | Skills panel refresh | Server → App |
+
+### 5.7 Settings Panels
+
+| Protocol Message | UI Panel | Direction |
+|-----------------|----------|-----------|
+| `config/read` | Load settings form | App → Server |
+| `config/writeValue` | Save single setting | App → Server |
+| `config/batchWrite` | Save multiple settings at once | App → Server |
+| `config/warning` | Config file issue notification | Server → App |
+| `config/requirementsChanged` | Config requirements update | Server → App |
+| `thread/settings/updated` | Per-thread settings changed | Server → App |
+| `model/list` | Model selector options | App → Server |
+| `modelProviderCapabilities/read` | Provider capabilities | App → Server |
+| `permissionProfile/list` | Permission profiles list | App → Server |
+| `experimentalFeature/list` | Feature flags browser | App → Server |
+| `experimentalFeature/setEnablement` | Toggle feature | App → Server |
+
+### 5.8 Plugin / Marketplace
+
+| Protocol Message | UI Element | Direction |
+|-----------------|------------|-----------|
+| `plugin/list` | Installed plugins list | App → Server |
+| `plugin/install` | Install plugin from marketplace | App → Server |
+| `plugin/uninstall` | Remove plugin | App → Server |
+| `plugin/read` | Plugin details view | App → Server |
+| `plugin/skill/read` | Plugin skill details | App → Server |
+| `marketplace/add/remove/upgrade` | Marketplace operations | App → Server |
+| `plugin/share/save/list/checkout/delete/updateTargets` | Plugin sharing | App → Server |
+
+### 5.9 Realtime Audio
+
+| Protocol Message | UI Element | Direction |
+|-----------------|------------|-----------|
+| `thread/realtime/started` | Audio session active indicator | Server → App |
+| `thread/realtime/outputAudioDelta` | Audio playback | Server → App |
+| `thread/realtime/transcriptDelta` | Live transcription | Server → App |
+| `thread/realtime/sdp` | WebRTC connection state | Server → App |
+
+---
+
+## 6. UI Layout (Derived from Protocol)
+
+Based on the protocol surface area, the desktop app UI consists of:
+
+### 6.1 Layout Structure
+```
+┌─────────────────────────────┬────────────────────────────────┐
+│  Left Column                │  Main Content Area             │
+│  ┌───────────────────────┐  │  ┌──────────────────────────┐  │
+│  │  Thread List          │  │  │  Chat Messages           │  │
+│  │  - Thread 1 (active)  │  │  │  - Streaming text        │  │
+│  │  - Thread 2 (idle)    │  │  │  - Code blocks           │  │
+│  │  - Thread 3 (error)   │  │  │  - Reasoning expander    │  │
+│  │  App List             │  │  │  - Approval requests     │  │
+│  │  - GitHub             │  │  │  - Diff previews         │  │
+│  │  - Slack              │  │  └──────────────────────────┘  │
+│  │  Search / New Thread  │  │  ┌──────────────────────────┐  │
+│  └───────────────────────┘  │  │  Input Area               │  │
+│                             │  │  - Text input             │  │
+│                             │  │  - Send/Stop buttons      │  │
+│                             │  └──────────────────────────┘  │
+│  Right Panel (optional)     │                                │
+│  ┌───────────────────────┐  │                                │
+│  │  Tab: Flow/Terminal   │  │                                │
+│  │  - Activity stream    │  │                                │
+│  │  - File changes       │  │                                │
+│  │  - Command output     │  │                                │
+│  │  - Plan steps         │  │                                │
+│  └───────────────────────┘  │                                │
+└─────────────────────────────┴────────────────────────────────┘
+```
+
+### 6.2 Window Areas
+
+1. **Left Column** (~240-280px)
+   - Thread list with status indicators (idle/active/waitingOnApproval/waitingOnUserInput/systemError)
+   - App list with logos, enbaled/disabled toggles, install buttons
+   - Skills/plugins browser
+   - Search/new thread input
+
+2. **Main Content** (flexible)
+   - **Chat View**: Streaming agent messages, code blocks, file diffs, reasoning panels
+   - **Input Bar**: Text input, send/stop buttons, attachment capabilities
+   - **Inline Diffs**: Color-coded file changes within conversation
+   - **Approval Dialogs**: Modal overlays for permission requests
+   - **Inline Forms**: User input questions with text fields, secret inputs, selectable options
+
+3. **Right Panel** (~320-400px, toggleable)
+   - Flow/Activity tab: Real-time event stream for tool calls, file changes, plan steps
+   - Terminal tab: PTY-based shell session with stdin/stdout/stderr streaming, resize support
+   - Settings tab: Full config editor with layered settings (user/project/system/MDM)
+
+---
+
+## 7. Thread Status Model
+
+Threads have a state machine for UI rendering:
+
+```
+notLoaded ──> idle ──> active ──> idle
+                ↑         │          │
+                │         ↓          │
+                │     systemError    │
+                └────────────────────┘
+```
+
+While `active`, a thread can have flags:
+- `waitingOnApproval` — Approval dialog visible, input blocked
+- `waitingOnUserInput` — Form dialog visible, input blocked
+
+---
+
+## 8. Config System Structure
+
+The config is organized in layers with increasing priority:
+1. **Built-in defaults** (lowest priority)
+2. **Project config** — per-project `config.toml`
+3. **User config** — user-level `config.toml`
+4. **System config** — managed `managed_config.toml`
+5. **MDM config** — macOS Managed Preferences (`com.openai.codex` domain)
+
+Each layer has a `disabledReason` field for when a higher-priority layer overrides it.
+
+Config sections relevant to the desktop app:
+- `desktop` — Desktop-specific settings (arbitrary object)
+- `model`, `model_provider`, `model_reasoning_effort`, `model_verbosity`, etc.
+- `sandbox_mode`, `sandbox_workspace_write`
+- `approval_policy`, `approvals_reviewer`
+- `tools`, `web_search`
+- `apps` — App/connector configurations
+- `analytics` — Telemetry settings
+- `forced_chatgpt_workspace_id`, `forced_login_method` — Enterprise config
+
+---
+
+## 9. macOS Specifics
+
+### Code Signing
+- Entitlements: `com.apple.security.cs.allow-jit` (JIT compilation)
+- Signed with Apple Developer ID certificate
+- Notarized with Apple notary service
+- Binaries signed: `codex`, `codex-responses-api-proxy`
+- DMG also signed and notarized, stapled
+
+### Distribution
+- Hosted at `https://persistent.oaistatic.com/codex-app-prod/`
+- ARM64: `Codex.dmg`
+- x64: `Codex-latest-x64.dmg`
+- Installed to `/Applications/Codex.app` or `~/Applications/Codex.app`
+
+### Login Page Design Tokens (Actual App CSS)
+```
+Font: "SF Pro", ui-sans-serif, system-ui, -apple-system
+Light mode: #ffffff bg, #0d0d0d text
+Dark mode:  #181818 bg, #ffffff text
+Border radii: 999px (buttons), 16px (cards)
+Button style: border-only, rounded-full, hover background
+Wordmark: "ChatGPT" at top-left, 21px, 650 weight
+```
+
+### Codex Logo
+SVG path representing a stylized "C" mark:
+```svg
+M22.356 19.797H17.17
+M9.662 12.29l1.979 3.576a.511.511 0 0 1-.005.504l-1.974 3.409
+M30.758 16c0 8.15-6.607 14.758-14.758 14.758...
+```
+Used as favicon, in login pages, and likely as app icon.
+
+---
+
+## 10. Key Differences From Previous Analysis
+
+This analysis replaces previous speculative designs. Key corrections:
+
+| Previous (Speculative) | Actual (From Source) |
+|------------------------|---------------------|
+| Dark theme dominant | Light theme default with dark mode support |
+| #0081f2 accent color | No accent color confirmed in protocol |
+| Inter font family | "SF Pro" / system fonts confirmed |
+| Three-column layout | Two-column + optional panel confirmed by protocol |
+| 48px icon rail | Not confirmed; protocol shows thread list + app list sidebar |
+| CDP-based browser | No browser view in protocol; realtime audio confirmed |
+| Electron/Native hybrid | Native .app bundle with SwiftUI likely |
+| Right panel: Flow/Browser/Terminal | Right panel: Flow/Terminal/Settings (no browser tab confirmed) |
+| Three bouncing dots typing indicator | Not confirmed in protocol |
+| #1a1a1a main bg | #ffffff (light) / #181818 (dark) from login pages |
