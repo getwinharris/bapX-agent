@@ -5,7 +5,7 @@ import { authRoutes } from './routes/auth.js'
 import { userRoutes } from './routes/user.js'
 import { chatRoutes } from './routes/chat.js'
 import { sandboxRoutes } from './routes/sandbox.js'
-import { projectRoutes, mcpRoutes, automationRoutes, skillRoutes } from './routes/features.js'
+import { projectRoutes, mcpRoutes, automationRoutes, skillRoutes, hermesSkillRoutes, skillsListRoutes, userSkillsRoutes } from './routes/features.js'
 import { requireJwtSecret } from './middleware/auth.js'
 
 const PORT = parseInt(process.env.PORT || '3001', 10)
@@ -43,6 +43,9 @@ await app.register(projectRoutes, { prefix: '/api/projects' })
 await app.register(mcpRoutes, { prefix: '/api/mcp' })
 await app.register(automationRoutes, { prefix: '/api/automation' })
 await app.register(skillRoutes, { prefix: '/api/skills' })
+await app.register(hermesSkillRoutes, { prefix: '/api/hermes-skills' })
+await app.register(skillsListRoutes, { prefix: '/api' })
+await app.register(userSkillsRoutes, { prefix: '/api' })
 
 // Health check
 app.get('/api/health', async () => ({ status: 'ok', time: new Date().toISOString() }))

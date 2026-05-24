@@ -1,5 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { v4 as uuid } from 'uuid'
+import fs from 'fs'
+import path from 'path'
 import db from '../db.js'
 import { authMiddleware } from '../middleware/auth.js'
 
@@ -168,5 +170,123 @@ export async function skillRoutes(app: FastifyInstance) {
     const { id } = request.params as any
     db.prepare('DELETE FROM skills WHERE id = ? AND user_id = ?').run(id, request.userId)
     return { success: true }
+  })
+}
+
+const HERMES_SKILLS_PATH = '/usr/local/lib/hermes-agent/skills'
+
+interface HermesSkill {
+  name: string
+  description: string
+  category: string
+}
+
+/** Parse the first line of a SKILL.md to extract name and description from YAML frontmatter */
+function parseSkillMd(filePath: string): { name: string; description: string } {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8')
+    const lines = content.split('\n')
+    let name = '', description = ''
+    let inFrontmatter = false
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (trimmed === '---') {
+        if (!inFrontmatter) { inFrontmatter = true; continue }
+        else break
+      }
+      if (!inFrontmatter) break
+      if (trimmed.startsWith('name:')) {
+        name = trimmed.slice(5).trim().replace(/^['"]|['"]$/g, '')
+      }
+      if (trimmed.startsWith('description:')) {
+        description = trimmed.slice(12).trim().replace(/^['"]|['"]$/g, '')
+      }
+    }
+    return { name, description }
+  } catch {
+    return { name: '', description: '' }
+  }
+}
+
+/** Read Hermes skills from the filesystem — returns a flat list */
+export async function hermesSkillRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', authMiddleware)
+
+  app.get('/', async () => {
+    const skills: HermesSkill[] = []
+    if (!fs.existsSync(HERMES_SKILLS_PATH)) return { skills }
+
+    const categories = fs.readdirSync(HERMES_SKILLS_PATH, { withFileTypes: true })
+    for (const cat of categories) {
+      if (!cat.isDirectory()) continue
+      const catPath = path.join(HERMES_SKILLS_PATH, cat.name)
+      const entries = fs.readdirSync(catPath, { withFileTypes: true })
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue
+        const skillDir = path.join(catPath, entry.name)
+        const skillMdPath = path.join(skillDir, 'SKILL.md')
+        if (fs.existsSync(skillMdPath)) {
+          const { name, description } = parseSkillMd(skillMdPath)
+          skills.push({
+            name: name || entry.name,
+            description: description || '',
+            category: cat.name,
+          })
+        }
+      }
+    }
+
+    // Sort alphabetically by name
+    skills.sort((a, b) => a.name.localeCompare(b.name))
+    return { skills }
+  })
+}
+
+/** List all available Hermes skills from the filesystem — mounted at GET /skills */
+export async function skillsListRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', authMiddleware)
+
+  app.get('/skills', async () => {
+    const skills: HermesSkill[] = []
+    if (!fs.existsSync(HERMES_SKILLS_PATH)) return { skills }
+
+    const categories = fs.readdirSync(HERMES_SKILLS_PATH, { withFileTypes: true })
+    for (const cat of categories) {
+      if (!cat.isDirectory()) continue
+      const catPath = path.join(HERMES_SKILLS_PATH, cat.name)
+      const entries = fs.readdirSync(catPath, { withFileTypes: true })
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue
+        const skillDir = path.join(catPath, entry.name)
+        const skillMdPath = path.join(skillDir, 'SKILL.md')
+        if (fs.existsSync(skillMdPath)) {
+          const { name, description } = parseSkillMd(skillMdPath)
+          skills.push({
+            name: name || entry.name,
+            description: description || '',
+            category: cat.name,
+          })
+        }
+      }
+    }
+
+    skills.sort((a, b) => a.name.localeCompare(b.name))
+    return { skills }
+  })
+}
+
+/** Save user's enabled skills list — mounted at PUT /user/skills */
+export async function userSkillsRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', authMiddleware)
+
+  app.put('/user/skills', async (request, reply) => {
+    const { skills } = request.body as { skills?: string[] }
+    if (!Array.isArray(skills)) {
+      return reply.status(400).send({ error: 'skills must be a string array' })
+    }
+    const skillsJson = JSON.stringify(skills)
+    db.prepare("UPDATE users SET skills_enabled = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(skillsJson, request.userId)
+    return { success: true, skills }
   })
 }

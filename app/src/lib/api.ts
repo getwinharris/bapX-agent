@@ -121,7 +121,7 @@ export const api = {
       request('/user/pooled-credentials', { method: 'PUT', body: JSON.stringify({ credentials }) }),
     saveSkills: (skills: string[]) =>
       request('/user/skills', { method: 'PUT', body: JSON.stringify({ skills }) }),
-    getSkillsLibrary: () => request('/skills/'),
+    getSkillsLibrary: () => request('/hermes-skills/'),
     createSkill: (name: string, description: string, prompt: string) =>
       request('/skills/', { method: 'POST', body: JSON.stringify({ name, description, prompt }) }),
     updateSkill: (id: string, data: any) =>

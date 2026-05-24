@@ -100,7 +100,7 @@ export default function Dashboard() {
   const [streaming, setStreaming] = useState(false)
   const [sidebarSection, setSidebarSection] = useState<SidebarSection>('chat')
   const [rightTab, setRightTab] = useState<RightTab>('none')
-  const [mobileSidebar, setMobileSidebar] = useState(false)
+  const [mobileSidebarExpanded, setMobileSidebarExpanded] = useState(() => localStorage.getItem('mobileSidebarExpanded') === 'true')
   const [hasApiKey, setHasApiKey] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -215,6 +215,7 @@ export default function Dashboard() {
   useEffect(() => { if (sidebarSection === 'skills' && userSkills.length === 0) { fetchSkillsData().then(data => { setUserSkills(data.skills); setEnabledSkills(data.enabled) }).catch(() => {}) } }, [sidebarSection, userSkills.length])
   useEffect(() => { if (sidebarSection === 'library') { fetchLibraryData(libraryCategory).then(items => setLibraryItems(items)).catch(() => {}) } }, [sidebarSection, libraryCategory])
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  useEffect(() => { localStorage.setItem('mobileSidebarExpanded', String(mobileSidebarExpanded)) }, [mobileSidebarExpanded])
 
   // ── Chat ──
   const newChat = () => { setSessionId(null); setMessages([]) }
@@ -472,43 +473,56 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* ── MOBILE SIDEBAR OVERLAY — hidden by default, hamburger opens it ── */}
-      {mobileSidebar && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileSidebar(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-72 z-50 flex flex-col" style={{ background: '#0d0d1a' }}>
-            <div className="p-3 border-b border-surface-border flex items-center justify-between">
-              <span className="text-lg font-extrabold tracking-tight text-white">bap<span style={{ color: '#9651b8' }}>X</span></span>
-              <button onClick={() => setMobileSidebar(false)} className="text-gray-500 hover:text-white"><X size={16} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-              {sidebarItems.map(item => {
-                const Icon = item.icon
-                return (
-                  <button key={item.id} onClick={() => { setSidebarSection(item.id); setMobileSidebar(false) }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors">
-                    <Icon size={14} /> {item.label}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="p-2 border-t border-surface-border space-y-0.5">
-              <Link to="/settings" onClick={() => setMobileSidebar(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors">
-                <Settings size={14} /> Settings
-              </Link>
-              <button onClick={() => { logout(); setMobileSidebar(false) }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-950/20 transition-colors">
-                <LogOut size={14} /> Sign Out
-              </button>
-            </div>
-          </div>
+      {/* ── MOBILE SIDEBAR RAIL — always visible on mobile, expands on tap ── */}
+      <div className={`md:hidden fixed left-0 top-0 bottom-0 z-40 flex flex-col transition-all duration-200 ${mobileSidebarExpanded ? 'w-72' : 'w-12'}`} style={{ background: '#0d0d1a', borderRight: '1px solid var(--surface-border, #1e1e2e)' }}>
+        {/* Expanded header */}
+        <div className={`p-3 border-b border-surface-border flex items-center justify-between ${mobileSidebarExpanded ? '' : 'hidden'}`}>
+          <span className="text-lg font-extrabold tracking-tight text-white">bap<span style={{ color: '#9651b8' }}>X</span></span>
+          <button onClick={() => setMobileSidebarExpanded(false)} className="text-gray-500 hover:text-white"><X size={16} /></button>
         </div>
+        {/* Collapsed header — just logo initial */}
+        <div className={`p-2 border-b border-surface-border flex items-center justify-center ${mobileSidebarExpanded ? 'hidden' : ''}`}>
+          <span className="text-sm font-extrabold tracking-tight" style={{ color: '#9651b8' }}>b</span>
+        </div>
+        {/* Rail icons — always visible */}
+        <div className="flex-1 overflow-y-auto py-1">
+          {sidebarItems.map(item => {
+            const Icon = item.icon
+            return (
+              <button key={item.id} onClick={() => { setSidebarSection(item.id); if (!mobileSidebarExpanded) setMobileSidebarExpanded(true) }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${mobileSidebarExpanded ? 'rounded-lg text-sm' : 'justify-center'} ${
+                  sidebarSection === item.id ? 'bg-[#9651b8]/10 text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                }`}>
+                <Icon size={14} className="shrink-0" />
+                {mobileSidebarExpanded && <span>{item.label}</span>}
+              </button>
+            )
+          })}
+        </div>
+        {/* Bottom actions */}
+        <div className="border-t border-surface-border py-1">
+          <Link to="/settings" onClick={() => setMobileSidebarExpanded(false)}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${mobileSidebarExpanded ? 'rounded-lg text-sm' : 'justify-center'} text-gray-400 hover:text-gray-200 hover:bg-white/5`}>
+            <Settings size={14} className="shrink-0" />
+            {mobileSidebarExpanded && <span>Settings</span>}
+          </Link>
+          <button onClick={() => { logout(); setMobileSidebarExpanded(false) }}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${mobileSidebarExpanded ? 'rounded-lg text-sm' : 'justify-center'} text-gray-400 hover:text-red-400 hover:bg-red-950/20`}>
+            <LogOut size={14} className="shrink-0" />
+            {mobileSidebarExpanded && <span>Sign Out</span>}
+          </button>
+        </div>
+      </div>
+      {/* Backdrop when expanded */}
+      {mobileSidebarExpanded && (
+        <div className="fixed inset-0 z-30 md:hidden bg-black/60" onClick={() => setMobileSidebarExpanded(false)} />
       )}
 
       {/* ── CENTER PANEL ── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 md:ml-0 ml-12">
         {/* Top bar */}
         <header className="flex items-center gap-2 px-3 h-11 border-b border-surface-border shrink-0">
-          <button onClick={() => setMobileSidebar(true)} className="text-gray-400 hover:text-white p-1 md:hidden"><Menu size={16} /></button>
+          <button onClick={() => setMobileSidebarExpanded(true)} className="text-gray-400 hover:text-white p-1 md:hidden"><Menu size={16} /></button>
           <span className="text-xs font-semibold text-gray-300">
             {sidebarSection === 'chat' && (sessionId ? 'Chat' : 'New Chat')}
             {sidebarSection === 'projects' && 'Projects'}

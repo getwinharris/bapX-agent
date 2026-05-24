@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
 import { v4 as uuid } from 'uuid'
 import db from '../db.js'
-import { signToken } from '../middleware/auth.js'
+import { signToken, authMiddleware } from '../middleware/auth.js'
 
 function generateSoul(username: string, name: string, age: string, nature: string, agentName: string, bio: string): string {
   return `# SOUL.md — ${name}'s Agent Configuration
@@ -115,5 +115,82 @@ export async function authRoutes(app: FastifyInstance) {
         provider: user.provider, model: user.model
       }
     }
+  })
+
+  // ── Simple OAuth provider routes (body-based) ──
+  const VALID_PROVIDERS = ['openai-codex', 'anthropic-oauth', 'xai-oauth', 'google-gemini-oauth', 'nous', 'minimax-oauth']
+
+  app.post('/oauth/start', { preHandler: authMiddleware }, async (request, reply) => {
+    const { provider } = request.body as { provider?: string }
+    if (!provider) return reply.status(400).send({ error: 'provider is required' })
+    if (!VALID_PROVIDERS.includes(provider)) {
+      return reply.status(400).send({ error: `Invalid provider. Valid: ${VALID_PROVIDERS.join(', ')}` })
+    }
+    db.prepare("UPDATE users SET oauth_provider = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(provider, request.userId)
+    return { provider, status: 'configured' }
+  })
+
+  app.post('/oauth/save', { preHandler: authMiddleware }, async (request, reply) => {
+    const { provider } = request.body as { provider?: string }
+    if (!provider) return reply.status(400).send({ error: 'provider is required' })
+    if (!VALID_PROVIDERS.includes(provider)) {
+      return reply.status(400).send({ error: `Invalid provider. Valid: ${VALID_PROVIDERS.join(', ')}` })
+    }
+    db.prepare("UPDATE users SET oauth_provider = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(provider, request.userId)
+    return { provider, status: 'saved' }
+  })
+
+  // ── OAuth Device-Code Flow ──
+
+  const OAUTH_DEVICE_URLS: Record<string, string> = {
+    'nous': 'https://portal.nousresearch.com',
+    'openai-codex': 'https://chatgpt.com/backend-api/codex',
+    'xai-oauth': 'https://api.x.ai',
+    'minimax-oauth': 'https://minimax.io',
+    'google-gemini-oauth': 'https://cloud.google.com/code-assist',
+  }
+  const VALID_OAUTH_PROVIDERS = Object.keys(OAUTH_DEVICE_URLS)
+
+  // Start OAuth flow — store provider, return the device-code URL
+  app.post('/oauth/:provider/start', { preHandler: authMiddleware }, async (request, reply) => {
+    const { provider } = request.params as { provider: string }
+    if (!VALID_OAUTH_PROVIDERS.includes(provider)) {
+      return reply.status(400).send({ error: `Invalid OAuth provider. Valid: ${VALID_OAUTH_PROVIDERS.join(', ')}` })
+    }
+    // Save the provider to the user record
+    db.prepare("UPDATE users SET oauth_provider = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(provider, request.userId)
+    return {
+      provider,
+      device_code_url: OAUTH_DEVICE_URLS[provider],
+      status_url: `/api/auth/oauth/${provider}/status`,
+      message: `Visit ${OAUTH_DEVICE_URLS[provider]} to authorize. Then call /oauth/${provider}/status to check.`
+    }
+  })
+
+  // Check OAuth status — return current provider from user row
+  app.post('/oauth/:provider/status', { preHandler: authMiddleware }, async (request, reply) => {
+    const { provider } = request.params as { provider: string }
+    const row = db.prepare('SELECT oauth_provider FROM users WHERE id = ?').get(request.userId) as { oauth_provider: string } | undefined
+    if (!row) return reply.status(404).send({ error: 'User not found' })
+    return {
+      provider,
+      active: row.oauth_provider === provider,
+      oauth_provider: row.oauth_provider,
+    }
+  })
+
+  // Save OAuth provider to user record
+  app.post('/oauth/save', { preHandler: authMiddleware }, async (request, reply) => {
+    const { provider } = request.body as { provider?: string }
+    if (!provider) return reply.status(400).send({ error: 'provider is required' })
+    if (!VALID_OAUTH_PROVIDERS.includes(provider)) {
+      return reply.status(400).send({ error: `Invalid OAuth provider. Valid: ${VALID_OAUTH_PROVIDERS.join(', ')}` })
+    }
+    db.prepare("UPDATE users SET oauth_provider = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(provider, request.userId)
+    return { success: true, provider }
   })
 }
