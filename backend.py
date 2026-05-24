@@ -10,6 +10,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
+from fastapi.background import BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 import hashlib, secrets
@@ -729,8 +730,12 @@ async def text_to_speech(req: TTSReq):
         tmp_path = tmp.name
         tmp.close()
         tts.generate_to_file(text, tmp_path)
+        # Schedule cleanup after response
+        background_tasks = BackgroundTasks()
+        background_tasks.add_task(os.unlink, tmp_path)
         return FileResponse(tmp_path, media_type="audio/wav", filename="tts.wav",
-                            headers={"Content-Disposition": "inline"})
+                            headers={"Content-Disposition": "inline"},
+                            background=background_tasks)
     except Exception as e:
         raise HTTPException(500, f"TTS generation failed: {str(e)}")
 
