@@ -1,0 +1,35 @@
+bapx.in, www.bapx.in {
+	handle /api/* {
+		reverse_proxy 127.0.0.1:7654
+	}
+	handle /health {
+		reverse_proxy 127.0.0.1:7654
+	}
+	handle {
+		root * /root/Dev/bapx/static
+		try_files {path} /index.html
+		file_server
+	}
+	header {
+		X-Forwarded-Proto "https"
+		X-Forwarded-Host "bapx.in"
+	}
+}
+
+agent.bapx.in {
+	handle /api/* {
+		reverse_proxy 127.0.0.1:7654
+	}
+	handle /v1/* {
+		reverse_proxy 127.0.0.1:7654
+	}
+	handle {
+		root * /root/Dev/bapx/static
+		try_files {path} /dashboard.html
+		file_server
+	}
+	header {
+		X-Forwarded-Proto "https"
+		X-Forwarded-Host "agent.bapx.in"
+	}
+}
