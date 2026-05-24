@@ -73,9 +73,12 @@ async function initDashboard() {
   await loadOAuthProviders();
   await loadSkills();
   await loadInstalledSkills();
+  await loadMemory();
   await loadSlashCommands();
   setSandboxStatus('idle');
   switchView('chat');
+  // Start onboarding tour (if not completed)
+  if (typeof startTour === 'function') startTour();
 }
 
 // ── Navigation ──
@@ -721,30 +724,74 @@ document.addEventListener('DOMContentLoaded', init);
 // RIGHT PANEL — Flow View, Browser, Terminal
 // ═══════════════════════════════════════════
 
-// ── Flow View (Agent Activity Stream) ──
-function addFlowStep(type, title, desc, status) {
+// ── Task Queue with Status Grouping ──
+let taskQueue = [];
+
+function addTask(status, title, desc) {
+  taskQueue.push({ id: Date.now(), status, title, desc, time: new Date() });
+  renderTaskQueue();
+}
+
+function updateTaskStatus(id, newStatus) {
+  const task = taskQueue.find(t => t.id === id);
+  if (task) { task.status = newStatus; renderTaskQueue(); }
+}
+
+function renderTaskQueue() {
   const list = document.getElementById('flow-list');
   const empty = document.getElementById('flow-empty');
   if (empty) empty.remove();
 
-  const icons = { think:'💭', term:'▸', file:'📄', diff:'↔', error:'✕', check:'✓' };
-  const icon = icons[type] || '○';
-  const step = document.createElement('div');
-  step.className = 'flow-step' + (status === 'error' ? ' step-error' : status === 'running' ? ' step-running' : '');
-  const spinner = status === 'running' ? '<span class="flow-step-spinner"></span>' : '';
-  step.innerHTML =
-    `<div class="flow-step-icon icon-${type}">${icon}</div>` +
-    `<div class="flow-step-body">` +
-      `<div class="flow-step-title">${title}${spinner}</div>` +
-      (desc ? `<div class="flow-step-desc">${desc}</div>` : '') +
-      `<div class="flow-step-time">${new Date().toLocaleTimeString()}</div>` +
-    `</div>`;
-  list.appendChild(step);
-  list.scrollTop = list.scrollHeight;
+  const groups = { running: [], pending: [], done: [], error: [] };
+  taskQueue.forEach(t => {
+    (groups[t.status] || groups.done).push(t);
+  });
+
+  list.innerHTML = '';
+  // Show running first, then pending, then done
+  ['running', 'pending', 'done', 'error'].forEach(status => {
+    const items = groups[status] || [];
+    if (!items.length) return;
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    list.innerHTML += `<div class="flow-group-label" style="font-size:.625rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:4px 2px;margin-top:${status === 'running' ? '0' : '4px'}">${label} (${items.length})</div>`;
+    items.slice(-10).forEach(t => {
+      const icons = { think:'💭', term:'▸', file:'📄', diff:'↔', error:'✕', check:'✓', pending:'○', running:'⟳' };
+      const icon = icons[t.status] || icons[status] || '○';
+      const step = document.createElement('div');
+      step.className = 'flow-step' + (t.status === 'error' ? ' step-error' : t.status === 'running' ? ' step-running' : '');
+      const spinner = t.status === 'running' ? '<span class="flow-step-spinner"></span>' : '';
+      step.innerHTML =
+        `<div class="flow-step-icon icon-${t.status === 'error' ? 'error' : t.status === 'running' ? 'think' : 'check'}">${icon}</div>` +
+        `<div class="flow-step-body">` +
+          `<div class="flow-step-title">${t.title}${spinner}</div>` +
+          (t.desc ? `<div class="flow-step-desc">${t.desc}</div>` : '') +
+          `<div class="flow-step-time">${t.time.toLocaleTimeString()}</div>` +
+        `</div>`;
+      list.appendChild(step);
+    });
+  });
+
+  if (!list.children.length) {
+    list.innerHTML = `<div class="flow-empty" id="flow-empty">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>Agent activity will appear here</span></div>`;
+  }
 
   // Update stats
-  document.getElementById('flow-steps-total').textContent =
-    parseInt(document.getElementById('flow-steps-total').textContent) + 1;
+  const total = taskQueue.length;
+  const files = taskQueue.filter(t => t.title.startsWith('Changed:') || t.title.startsWith('Modified:')).length;
+  document.getElementById('flow-steps-total').textContent = total;
+  document.getElementById('flow-files-changed').textContent = files;
+}
+
+// ── Flow View (Agent Activity Stream) ──
+function addFlowStep(type, title, desc, status) {
+  // Use task queue system
+  const id = Date.now();
+  const taskStatus = status === 'error' ? 'error' : status === 'running' ? 'running' : 'done';
+  taskQueue.push({ id, status: taskStatus, title, desc, time: new Date() });
+  renderTaskQueue();
+  return id;
 }
 
 function addFlowTerm(cmd, output) {
@@ -778,10 +825,8 @@ function addFlowAgentStep(desc) {
 }
 
 function clearFlow() {
-  document.getElementById('flow-list').innerHTML =
-    `<div class="flow-empty" id="flow-empty">` +
-    `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` +
-    `<span>Agent activity will appear here</span></div>`;
+  taskQueue = [];
+  renderTaskQueue();
   document.getElementById('flow-steps-total').textContent = '0';
   document.getElementById('flow-files-changed').textContent = '0';
 }
@@ -869,6 +914,167 @@ async function sendTermCommand() {
 function clearTerm() {
   document.getElementById('term-output').innerHTML =
     `<div class="term-line term-welcome"><span class="term-prompt">$</span> bapX sandbox terminal</div>`;
+}
+
+// ── Browser Annotations (Manus-style: click element → add note → agent acts) ──
+let annotateActive = false;
+let annotateListener = null;
+
+function toggleBrowserAnnotate() {
+  annotateActive = !annotateActive;
+  const btn = document.getElementById('br-annotate-btn');
+  const overlay = document.getElementById('br-annotate-overlay');
+  const frame = document.getElementById('br-frame');
+
+  btn.classList.toggle('active', annotateActive);
+  overlay.classList.toggle('hidden', !annotateActive);
+
+  if (annotateActive) {
+    // Try to inject click listener into iframe
+    try {
+      const iframeDoc = frame.contentDocument || frame.contentWindow.document;
+      iframeDoc.body.style.cursor = 'crosshair';
+      annotateListener = (e) => {
+        e.stopPropagation();
+        const target = e.target;
+        // Get element info
+        const tag = target.tagName.toLowerCase();
+        const id = target.id ? '#' + target.id : '';
+        const cls = target.className && typeof target.className === 'string'
+          ? '.' + target.className.split(' ').filter(Boolean).join('.') : '';
+        const selector = tag + id + (cls ? cls.slice(0, 40) : '');
+        const text = (target.textContent || '').trim().slice(0, 80);
+        const rect = target.getBoundingClientRect();
+
+        // Position marker on our overlay
+        const marker = document.createElement('div');
+        marker.className = 'annotate-marker';
+        marker.style.left = (e.clientX) + 'px';
+        marker.style.top = (e.clientY) + 'px';
+        // Remove old markers
+        document.querySelectorAll('.annotate-marker').forEach(m => m.remove());
+        document.querySelectorAll('.annotate-badge').forEach(m => m.remove());
+        document.getElementById('br-annotate-overlay').appendChild(marker);
+
+        // Show badge
+        const badge = document.createElement('div');
+        badge.className = 'annotate-badge';
+        badge.textContent = text ? '"' + text.slice(0, 25) + '..."' : tag;
+        badge.style.left = e.clientX + 'px';
+        badge.style.top = e.clientY + 'px';
+        document.getElementById('br-annotate-overlay').appendChild(badge);
+
+        // Open annotate modal
+        document.getElementById('annotate-selector').textContent = selector;
+        document.getElementById('annotate-text').value = '';
+        document.getElementById('annotate-image-url').value = '';
+        document.getElementById('annotate-modal').classList.remove('hidden');
+
+        // Store annotation context
+        window._lastAnnotation = { selector, text, x: e.clientX, y: e.clientY };
+      };
+      iframeDoc.addEventListener('click', annotateListener, true);
+    } catch(e) {
+      // Cross-origin iframe - show modal for manual input
+      document.getElementById('annotate-selector').textContent = '(cross-origin)';
+      document.getElementById('annotate-text').value = 'Navigate to: ' + document.getElementById('br-url').value;
+      document.getElementById('annotate-modal').classList.remove('hidden');
+    }
+  } else {
+    // Clean up
+    document.querySelectorAll('.annotate-marker').forEach(m => m.remove());
+    document.querySelectorAll('.annotate-badge').forEach(m => m.remove());
+    if (annotateListener) {
+      try {
+        const iframeDoc = frame.contentDocument || frame.contentWindow.document;
+        iframeDoc.removeEventListener('click', annotateListener, true);
+        iframeDoc.body.style.cursor = '';
+      } catch(e) {}
+      annotateListener = null;
+    }
+  }
+}
+
+function closeAnnotateModal() {
+  document.getElementById('annotate-modal').classList.add('hidden');
+}
+
+async function submitAnnotate() {
+  const note = document.getElementById('annotate-text').value.trim();
+  const imageUrl = document.getElementById('annotate-image-url').value.trim();
+  const selector = document.getElementById('annotate-selector').textContent;
+  const url = document.getElementById('br-url').value;
+
+  if (!note && !imageUrl) {
+    document.getElementById('annotate-status').textContent = 'Please add a note or image URL';
+    document.getElementById('annotate-status').style.display = 'block';
+    return;
+  }
+
+  closeAnnotateModal();
+  document.querySelectorAll('.annotate-marker').forEach(m => m.remove());
+  document.querySelectorAll('.annotate-badge').forEach(m => m.remove());
+
+  // Build annotation context for agent
+  let annotation = `📍 **Browser Annotation**\nPage: ${url || 'current page'}\nElement: \`${selector}\``;
+  if (note) annotation += `\nNote: ${note}`;
+  if (imageUrl) annotation += `\nImage: ${imageUrl}`;
+
+  // Send as chat message
+  addMessage(annotation, 'user');
+  CHAT_HISTORY.push({role:'user', content: annotation});
+
+  // Auto-respond to agent
+  addTypingIndicator();
+  try {
+    const result = await apiJSON('/api/sandbox/exec', {
+      method:'POST', body:JSON.stringify({
+        command: `cd ~ && echo '${annotation.replace(/'/g, "'\\''")}' | bapX exec --timeout 120 2>/dev/null || echo 'Agent processing annotation'`,
+        language: 'bash'
+      })
+    });
+    removeTypingIndicator();
+    const response = result.output || 'Agent received annotation';
+    CHAT_HISTORY.push({role:'assistant', content: response});
+    addMessage(response, 'assistant');
+  } catch(e) {
+    removeTypingIndicator();
+    addMessage(`Processing: ${e.message}`, 'assistant');
+  }
+
+  // Turn off annotate mode
+  annotateActive = false;
+  document.getElementById('br-annotate-btn').classList.remove('active');
+  document.getElementById('br-annotate-overlay').classList.add('hidden');
+}
+
+// ── Memory System (USER.md / MEMORY.md auto-inject) ──
+async function loadMemory() {
+  try {
+    const userMem = await sbReadFile('USER.md');
+    const sysMem = await sbReadFile('MEMORY.md');
+    // Show memory status in flow
+    if (userMem && userMem.content) {
+      addFlowStep('check', 'Memory loaded', 'User profile: ' + userMem.content.slice(0, 60) + '...', 'done');
+    }
+    if (sysMem && sysMem.content) {
+      addFlowStep('check', 'System memory loaded', sysMem.content.slice(0, 60) + '...', 'done');
+    }
+  } catch(e) {
+    // No memory yet - that's fine (first visit)
+  }
+}
+
+async function saveMemory(type, content) {
+  // type: 'user' for USER.md, 'memory' for MEMORY.md
+  const filename = type === 'user' ? 'USER.md' : 'MEMORY.md';
+  try {
+    await sbWriteFile(filename, content);
+    return true;
+  } catch(e) {
+    console.error('Failed to save memory:', e);
+    return false;
+  }
 }
 
 // ── Slash Commands Popup ──

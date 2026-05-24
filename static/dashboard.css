@@ -295,3 +295,14 @@ a{color:var(--accent);text-decoration:none}
   .sidebar{width:48px}
   .sidebar.expanded{width:240px}
 }
+
+/* ANNOTATE OVERLAY */
+.br-annotate-btn.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+.br-annotate-overlay{position:absolute;inset:0;background:rgba(139,92,246,0.05);z-index:10;pointer-events:none;display:flex;align-items:flex-start;justify-content:center;padding-top:1rem}
+.br-annotate-tip{background:var(--accent);color:#fff;font-size:.6875rem;padding:.4rem .85rem;border-radius:8px;pointer-events:none;box-shadow:0 4px 16px rgba(139,92,246,0.3);animation:fadeIn .3s ease}
+.br-annotate-overlay.hidden{display:none}
+.br-annotate-active .br-frame{cursor:crosshair}
+.annotate-marker{position:absolute;width:20px;height:20px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 0 0 3px rgba(139,92,246,0.4);pointer-events:none;z-index:20;transform:translate(-50%,-50%);animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(139,92,246,0.4)}50%{box-shadow:0 0 0 6px rgba(139,92,246,0.15)}}
+.annotate-badge{position:absolute;z-index:21;pointer-events:none;font-size:.625rem;font-weight:700;color:#fff;background:var(--accent);padding:2px 6px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-130%)}
+

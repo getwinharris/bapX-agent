@@ -6,6 +6,7 @@
 <title>bapX</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="dashboard.css">
+<link rel="stylesheet" href="tour.css">
 </head>
 <body>
 <div id="app">
@@ -376,6 +377,12 @@
               <button class="br-btn" onclick="browserNav('refresh')">↻</button>
             </div>
             <input class="br-url" id="br-url" placeholder="https://..." onkeydown="if(event.key==='Enter')browserNavUrl()">
+            <button class="br-btn br-annotate-btn" id="br-annotate-btn" onclick="toggleBrowserAnnotate()" title="Annotate page (Manus-style)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+          </div>
+          <div class="br-annotate-overlay hidden" id="br-annotate-overlay">
+            <div class="br-annotate-tip">Click any element on the page to annotate it</div>
           </div>
           <iframe class="br-frame" id="br-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" src="about:blank"></iframe>
         </div>
@@ -413,6 +420,22 @@
   </div>
 </div>
 
+<!-- Annotate Modal -->
+<div class="modal-overlay hidden" id="annotate-modal" onclick="if(event.target===this)closeAnnotateModal()">
+  <div class="modal" style="text-align:left">
+    <h3 id="annotate-title">Annotate Element</h3>
+    <p id="annotate-element-info" style="font-size:.75rem;color:var(--muted);word-break:break-all;margin-bottom:1rem">Selector: <code id="annotate-selector">unknown</code></p>
+    <div class="field"><label>Note text (what the agent should know)</label><textarea id="annotate-text" rows="3" placeholder="e.g., Click this button and fill in the form..."></textarea></div>
+    <div class="field"><label>Or attach image URL (optional)</label><input id="annotate-image-url" placeholder="https://example.com/screenshot.png"></div>
+    <div style="display:flex;gap:.5rem;margin-top:.5rem">
+      <button class="btn" onclick="submitAnnotate()">Send to Agent</button>
+      <button class="btn btn-ghost" onclick="closeAnnotateModal()">Cancel</button>
+    </div>
+    <div class="msg info" id="annotate-status" style="display:none"></div>
+  </div>
+</div>
+
 <script src="dashboard.js"></script>
+<script src="tour.js"></script>
 </body>
 </html>
