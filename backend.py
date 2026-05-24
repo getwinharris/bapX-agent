@@ -344,23 +344,17 @@ OAUTH_CONFIGS = {
 }
 
 # ── Skills loader ──
-# Also load Hermes bundled skills from the copied directory
-HERMES_SKILLS_DIR = Path("/usr/local/lib/hermes-agent/skills")
+# Only load bapX-specific skills from our own directory, NOT Hermes global skills
 def load_default_skills() -> list[dict]:
-    """Load all SKILL.md files from bapX + Hermes skills directories."""
+    """Load all SKILL.md files from bapX skills directory only."""
     skills = []
-    dirs = []
     if SKILLS_DIR.exists():
-        dirs.append(SKILLS_DIR)
-    if HERMES_SKILLS_DIR.exists():
-        dirs.append(HERMES_SKILLS_DIR)
-    for skills_dir in dirs:
-        for path in skills_dir.rglob("SKILL.md"):
+        for path in SKILLS_DIR.rglob("SKILL.md"):
             try:
                 content = path.read_text(encoding="utf-8", errors="replace")
                 name = path.parent.name
                 desc = ""
-                category = path.parent.parent.name if path.parent.parent != skills_dir else ""
+                category = path.parent.parent.name if path.parent.parent != SKILLS_DIR else ""
                 if content.startswith("---"):
                     parts = content.split("---", 2)
                     if len(parts) >= 3:
