@@ -2,1241 +2,305 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>bapX</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0f0f13;--bg2:#14141c;--bg3:#1a1a24;--fg:#e8e8f0;--muted:#6b7280;--accent:#9651b8;--accent-hover:#7a3f9e;--border:rgba(255,255,255,0.06);--radius:8px;--radius-lg:12px;--shadow:0 2px 12px rgba(0,0,0,0.3)}
-body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);min-height:100dvh;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-input,textarea,select,button{font-family:inherit}
-a{color:var(--accent);text-decoration:none}
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-::-webkit-scrollbar-thumb:hover{background:var(--muted)}
-
-/* ── Auth Pages ── */
-.auth-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:2rem 1rem;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.auth-page::-webkit-scrollbar{width:4px}
-/* Fix mobile keyboard pushing content */
-@media(max-width:768px){
-  .auth-page{min-height:-webkit-fill-available;min-height:100dvh;padding:1.5rem 1rem 4rem}
-}
-.auth-logo{font-size:2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:2rem;background:linear-gradient(135deg,#b35fd9,#7a3f9e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.auth-card{background:rgba(255,255,255,0.02);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2.5rem;width:100%;max-width:400px;animation:fadeIn .6s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-.auth-card h1{font-size:1.5rem;font-weight:700;margin-bottom:.25rem}
-.auth-card h1 span{color:var(--accent)}
-.auth-card .subtitle{color:var(--muted);font-size:.875rem;margin-bottom:2rem}
-.field{margin-bottom:1.25rem}
-.field label{display:block;font-size:.8125rem;font-weight:500;color:#9ca3af;margin-bottom:.375rem}
-.field input,.field select,.field textarea{width:100%;padding:.75rem .875rem;border-radius:var(--radius);border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--fg);font-size:.9375rem;outline:none;transition:border-color .2s}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(150,81,184,0.1)}
-.field input::placeholder,.field textarea::placeholder{color:#4b5563}
-.btn{display:inline-flex;align-items:center;justify-content:center;padding:.75rem 1.5rem;border-radius:var(--radius);border:none;background:linear-gradient(135deg,var(--accent),#7a3f9e);color:#fff;font-size:.9375rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
-.btn:hover{box-shadow:0 4px 16px rgba(150,81,184,0.25);transform:translateY(-1px)}
-.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
-.btn-block{width:100%}
-.btn-ghost{background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--fg)}
-.btn-ghost:hover{background:rgba(255,255,255,0.06);box-shadow:none;transform:none}
-.btn-sm{padding:.5rem 1rem;font-size:.8125rem}
-.btn-xs{padding:.3rem .6rem;font-size:.75rem}
-.error-msg{color:#ef4444;font-size:.8125rem;margin-top:.75rem;display:none}
-.success-msg{color:#22c55e;font-size:.8125rem;margin-top:.75rem;display:none}
-.auth-footer{margin-top:1.5rem;text-align:center;font-size:.8125rem;color:var(--muted)}
-.auth-footer a{color:#8890a0;text-decoration:underline;transition:color .2s}
-.auth-footer a:hover{color:#fff}
-.hidden{display:none!important}
-
-/* ── Dashboard Layout ── */
-.app{display:flex;height:100dvh;width:100vw;overflow:hidden}
-
-/* Sidebar */
-.sidebar{display:flex;flex-direction:column;background:var(--bg2);border-right:1px solid var(--border);transition:width .3s ease,transform .3s ease;flex-shrink:0;z-index:100;overflow:hidden}
-.sidebar-desktop{width:256px}
-.sidebar-icon{width:48px}
-.sidebar-header{display:flex;align-items:center;padding:1rem;flex-shrink:0;height:56px}
-.sidebar-logo{font-size:1.25rem;font-weight:800;letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;background:linear-gradient(135deg,#b35fd9,#7a3f9e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.sidebar-nav{flex:1;display:flex;flex-direction:column;gap:4px;padding:.5rem;overflow-y:auto}
-.nav-item{display:flex;align-items:center;gap:12px;padding:.625rem .75rem;border-radius:var(--radius);cursor:pointer;transition:all .2s;white-space:nowrap;overflow:hidden;color:var(--muted);border:none;background:transparent;font-size:.875rem;font-weight:500;text-align:left;width:100%;font-family:inherit}
-.nav-item:hover{background:rgba(255,255,255,0.04);color:var(--fg)}
-.nav-item.active{background:rgba(150,81,184,0.12);color:var(--accent)}
-.nav-icon{width:20px;height:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.nav-label{overflow:hidden;text-overflow:ellipsis}
-.sidebar-user{display:flex;align-items:center;gap:10px;padding:.75rem 1rem;border-top:1px solid var(--border);flex-shrink:0;cursor:pointer;transition:background .2s}
-.sidebar-user:hover{background:rgba(255,255,255,0.03)}
-.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7a3f9e);display:flex;align-items:center;justify-content:center;font-size:.875rem;font-weight:700;color:#fff;flex-shrink:0}
-.sidebar-icon .sidebar-user .avatar{width:28px;height:28px;font-size:.75rem}
-.sidebar-icon .sidebar-user .user-name,.sidebar-icon .nav-label{display:none}
-
-/* Main Content */
-.main-content{flex:1;display:flex;overflow:hidden;position:relative}
-.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
-.chat-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;background:rgba(20,20,28,0.8);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);z-index:10}
-.chat-header-title{font-size:.9375rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chat-messages{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:1rem}
-.chat-msg{max-width:80%;padding:.875rem 1rem;border-radius:var(--radius-lg);line-height:1.5;font-size:.9375rem;word-wrap:break-word;animation:msgIn .3s ease}
-@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.chat-msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
-.chat-msg.assistant{background:var(--bg3);align-self:flex-start;border-bottom-left-radius:4px}
-.chat-msg.system{background:rgba(255,255,255,0.03);align-self:center;font-size:.8125rem;color:var(--muted);max-width:60%;text-align:center}
-.chat-msg{position:relative}
-.tts-btn{position:absolute;bottom:6px;right:6px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:4px;line-height:0;display:flex;align-items:center;justify-content:center;transition:all .2s;opacity:0}
-.chat-msg:hover .tts-btn{opacity:1}
-.tts-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
-.chat-msg pre{background:rgba(0,0,0,0.3);border-radius:8px;padding:1rem;overflow-x:auto;margin:.5rem 0;font-size:.8125rem}
-.chat-msg code{font-size:.875rem;background:rgba(0,0,0,0.2);padding:.125rem .375rem;border-radius:4px}
-.chat-msg pre code{background:none;padding:0;border-radius:0}
-.chat-input-area{display:flex;gap:8px;padding:.75rem 1rem;border-top:1px solid var(--border);flex-shrink:0;align-items:flex-end;background:rgba(20,20,28,0.8);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.chat-input{flex:1;min-height:44px;max-height:150px;padding:.75rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg3);color:var(--fg);font-size:.9375rem;resize:none;outline:none;line-height:1.4}
-.chat-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(150,81,184,0.08)}
-.chat-send-btn{width:44px;height:44px;border-radius:var(--radius);background:linear-gradient(135deg,var(--accent),#7a3f9e);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
-.chat-send-btn:hover{box-shadow:0 4px 12px rgba(150,81,184,0.3);transform:translateY(-1px)}
-.chat-send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
-
-/* Right Panel */
-.right-panel{width:320px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width .3s ease}
-.right-panel.collapsed{width:0;border-left:none}
-.right-panel-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;background:rgba(20,20,28,0.8);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.rp-tab{padding:.625rem 1rem;font-size:.8125rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;background:transparent;border-top:none;border-left:none;border-right:none;font-family:inherit}
-.rp-tab:hover{color:var(--fg)}
-.rp-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.right-panel-content{flex:1;overflow-y:auto;padding:1rem}
-.rp-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);gap:.5rem;font-size:.875rem}
-.rp-placeholder svg{width:48px;height:48px;opacity:.3}
-
-/* Resizer */
-.resizer{width:4px;cursor:col-resize;background:transparent;flex-shrink:0;position:relative;z-index:10;transition:background .2s}
-.resizer:hover,.resizer.resizing{background:var(--accent)}
-
-/* Settings View — Manus-like polished */
-.settings-view{flex:1;overflow-y:auto;display:flex;flex-direction:column;background:var(--bg);height:100%}
-.settings-header{padding:2rem 2.5rem 1rem;flex-shrink:0;border-bottom:1px solid var(--border);background:rgba(20,20,28,0.8);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);position:sticky;top:0;z-index:10}
-.settings-header h2{font-size:1.375rem;font-weight:700;letter-spacing:-0.02em}
-.settings-header p{font-size:.8125rem;color:var(--muted);margin-top:.25rem}
-.settings-body{padding:2rem 2.5rem;display:flex;flex-direction:column;gap:1.5rem;max-width:900px}
-.settings-body h3{font-size:.8125rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:1rem;display:flex;align-items:center;gap:8px}
-.settings-section{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--radius-xl);padding:1.5rem;transition:border-color .2s}
-.settings-section:hover{border-color:rgba(150,81,184,0.12)}
-
-/* Connection status card — Manus style */
-.conn-card{display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1.25rem}
-.conn-card .conn-avatar{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
-.conn-card .conn-avatar.connected{background:rgba(34,197,94,0.12);color:#22c55e}
-.conn-card .conn-avatar.disconnected{background:rgba(239,68,68,0.1);color:#ef4444}
-.conn-card .conn-info{flex:1;min-width:0}
-.conn-card .conn-info h4{font-size:.9375rem;font-weight:600;margin-bottom:2px}
-.conn-card .conn-info p{font-size:.75rem;color:var(--muted)}
-.conn-status{display:inline-flex;align-items:center;gap:5px;font-size:.6875rem;font-weight:600;padding:.3rem .65rem;border-radius:6px}
-.conn-status.connected{background:rgba(34,197,94,0.1);color:#22c55e}
-.conn-status.disconnected{background:rgba(239,68,68,0.08);color:#ef4444}
-.conn-status .dot{width:5px;height:5px;border-radius:50%;display:inline-block;animation:pulse 2s infinite}
-.conn-status.connected .dot{background:#22c55e}
-.conn-status.disconnected .dot{background:#ef4444}
-
-/* Provider selector — polished */
-.prov-form{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.prov-form .field.full{grid-column:1/-1}
-.prov-form .field{margin-bottom:0}
-.prov-form .field label{display:block;font-size:.75rem;font-weight:500;color:#9ca3af;margin-bottom:.375rem;text-transform:uppercase;letter-spacing:.04em}
-.prov-form .field select,.prov-form .field input{width:100%;padding:.7rem .875rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg3);color:var(--fg);font-size:.875rem;outline:none;transition:all .2s;font-family:inherit}
-.prov-form .field select:focus,.prov-form .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(150,81,184,0.08)}
-.prov-form .btn{grid-column:1/-1;justify-self:start;padding:.625rem 1.5rem;font-size:.8125rem}
-
-/* Skills Grid */
-.skills-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.75rem}
-.skill-card{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;transition:all .2s;display:flex;flex-direction:column;gap:.5rem}
-.skill-card:hover{border-color:rgba(150,81,184,0.3);transform:translateY(-1px)}
-.skill-card h4{font-size:.875rem;font-weight:600}
-.skill-card p{font-size:.8125rem;color:var(--muted);line-height:1.4;flex:1}
-.skill-card .cat-badge{font-size:.6875rem;padding:.15rem .4rem;border-radius:6px;background:rgba(255,255,255,0.04);color:var(--muted);align-self:flex-start}
-.skill-card .toggle-wrap{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:.5rem;border-top:1px solid var(--border)}
-.toggle{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
-.toggle input{opacity:0;width:0;height:0}
-.toggle-slider{position:absolute;inset:0;background:var(--bg3);border-radius:10px;transition:.3s;border:1px solid var(--border)}
-.toggle-slider::before{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:var(--muted);top:2px;left:2px;transition:.3s}
-.toggle input:checked+.toggle-slider{background:var(--accent);border-color:var(--accent)}
-.toggle input:checked+.toggle-slider::before{background:#fff;transform:translateX(16px)}
-
-/* Search */
-.search-bar{width:100%;padding:.625rem .875rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg3);color:var(--fg);font-size:.875rem;outline:none;margin-bottom:1rem}
-.search-bar:focus{border-color:var(--accent)}
-
-/* Modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:200;animation:fadeIn .2s ease;}
-.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;width:90%;max-width:420px;text-align:center}
-.modal h3{font-size:1.125rem;font-weight:700;margin-bottom:.5rem}
-.modal p{color:var(--muted);font-size:.875rem;margin-bottom:1.5rem}
-.modal .code{font-family:'SF Mono','Fira Code',monospace;font-size:1.75rem;font-weight:700;color:var(--accent);letter-spacing:.15em;padding:.75rem 1.5rem;background:rgba(0,0,0,0.3);border-radius:var(--radius);display:inline-block;margin-bottom:1rem}
-.modal .url{font-size:.8125rem;color:var(--muted);word-break:break-all}
-.pulse{animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Hamburger */
-.hamburger{display:none;background:none;border:none;color:var(--fg);cursor:pointer;padding:4px;font-size:1.25rem;transition:color .2s}
-.hamburger:hover{color:var(--accent)}
-
-/* Sandbox status in right panel */
-.sandbox-bar{display:flex;align-items:center;gap:8px;padding:.5rem .75rem;border-bottom:1px solid var(--border);font-size:.75rem;flex-shrink:0;background:rgba(20,20,28,0.6)}
-.sandbox-bar .sb-status{font-weight:500}
-.sandbox-bar .sb-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
-.sb-running .sb-dot{background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,0.5)}
-.sb-stopped .sb-dot{background:#ef4444}
-.sb-none .sb-dot{background:var(--muted)}
-.sb-btn{padding:.2rem .5rem;font-size:.6875rem;border-radius:4px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--muted);cursor:pointer;font-family:inherit;transition:all .2s}
-.sb-btn:hover{color:var(--fg);border-color:var(--accent)}
-.sb-btn.sb-start{background:rgba(34,197,94,0.1);color:#22c55e;border-color:rgba(34,197,94,0.3)}
-.sb-btn.sb-start:hover{background:rgba(34,197,94,0.2)}
-.sb-btn.sb-stop{background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.3)}
-
-/* Provider group labels in select */
-.provider-group-label{font-size:.6875rem;color:var(--muted);padding:.375rem .75rem .125rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
-
-/* Mobile Backdrop */
-.backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;animation:fadeIn .2s ease}
-
-/* Empty state */
-.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;color:var(--muted);gap:.5rem}
-.empty-state svg{width:48px;height:48px;opacity:.3;margin-bottom:.5rem}
-.empty-state h3{font-size:1.125rem;font-weight:600}
-.empty-state p{font-size:.875rem}
-
-/* Typing indicator */
-.typing-indicator{display:flex;gap:4px;padding:.5rem 0;align-self:flex-start}
-.typing-indicator span{width:8px;height:8px;border-radius:50%;background:var(--muted);animation:bounce 1.4s infinite ease-in-out}
-.typing-indicator span:nth-child(2){animation-delay:.2s}
-.typing-indicator span:nth-child(3){animation-delay:.4s}
-@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
-
-/* Session header row */
-.sesh-row{display:flex;align-items:center;gap:8px;max-width:220px}
-.sesh-row select{flex:1;background:var(--bg3);color:var(--fg);border:1px solid var(--border);border-radius:6px;padding:.375rem .5rem;font-size:.8125rem;cursor:pointer}
-.sesh-row select:focus{border-color:var(--accent);outline:none}
-
-/** settings tabs */
-.settings-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
-.st-tab{padding:.625rem 1.25rem;font-size:.8125rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;background:transparent;border-top:none;border-left:none;border-right:none;font-family:inherit}
-.st-tab:hover{color:var(--fg)}
-.st-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-
-.oauth-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem}
-.oauth-card{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.5rem;transition:all .3s cubic-bezier(.22,1,.36,1)}
-.oauth-card:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,0.2)}
-.oauth-card .provider-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:700}
-.oauth-card h4{font-size:.8125rem;font-weight:600}
-.oauth-card p{font-size:.6875rem;color:var(--muted);line-height:1.3;min-height:1.5em}
-.oauth-card .badge-conn{font-size:.6875rem;font-weight:600;padding:.25rem .65rem;border-radius:10px;background:rgba(34,197,94,0.1);color:#22c55e}
-
-/* Responsive - mobile: show icon-only sidebar by default, expand on tap */
-@media(max-width:768px){
-  .sidebar-desktop{width:48px!important;overflow:hidden!important}
-  .sidebar-icon .nav-label{display:none!important}
-  .sidebar-desktop .nav-label{display:none!important}
-  .sidebar-desktop .sidebar-logo{font-size:0!important}
-  .sidebar-desktop .avatar{width:28px!important;height:28px!important;font-size:.75rem!important}
-  .sidebar-header{padding:.75rem!important}
-  .hamburger{display:block!important}
-  .sidebar.mobile-expanded{width:256px!important;position:fixed!important;left:0;top:0;bottom:0;z-index:100;box-shadow:4px 0 20px rgba(0,0,0,0.5);overflow-y:auto!important}
-  .sidebar.mobile-expanded .nav-label,.sidebar.mobile-expanded .user-name{display:inline!important}
-  .sidebar.mobile-expanded .sidebar-logo{font-size:1.25rem!important}
-  .sidebar.mobile-expanded .sidebar-user .avatar{width:32px!important;height:32px!important;font-size:.8125rem!important}
-  .backdrop.show{display:block!important}
-  .right-panel{width:0!important;border-left:none!important}
-  .right-panel.mobile-open{position:fixed!important;right:0;top:0;bottom:0;width:300px!important;z-index:100;box-shadow:-4px 0 20px rgba(0,0,0,0.5)}
-  .chat-msg{max-width:90%}
-  .settings-body{padding:1rem}
-  .skills-grid{grid-template-columns:1fr}
-  .oauth-grid{grid-template-columns:1fr 1fr}
-  .settings-header{padding:1rem 1rem .5rem}
-  .sesh-row select{max-width:130px}
-}
-</style>
+<link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-
-<div id="app" class="app">
+<div id="app">
   <!-- LOGIN -->
-  <div id="page-login" class="auth-page hidden" style="width:100%">
+  <div id="page-login" class="auth-page">
     <div class="auth-logo">bapX</div>
     <div class="auth-card">
       <h1>Welcome <span>back</span></h1>
-      <p class="subtitle">Sign in to your account.</p>
+      <p class="auth-subtitle">Sign in to your account</p>
       <div class="field"><label>Email</label><input id="login-email" type="email" placeholder="you@email.com" autocomplete="email"></div>
       <div class="field"><label>Password</label><input id="login-pass" type="password" placeholder="password" autocomplete="current-password"></div>
-      <button class="btn btn-block" id="login-btn" onclick="doLogin()">Sign In</button>
-      <div class="error-msg" id="login-error"></div>
-      <div class="auth-footer">Don't have an account? <a href="#" onclick="return navigateTo('signup')">Sign Up</a></div>
+      <button class="btn btn-block" onclick="doLogin()">Sign In</button>
+      <div class="msg error" id="login-error"></div>
+      <div class="auth-footer">Don't have an account? <a href="#" onclick="return showPage('signup')">Sign Up</a></div>
     </div>
   </div>
 
   <!-- SIGNUP -->
-  <div id="page-signup" class="auth-page hidden" style="width:100%">
+  <div id="page-signup" class="auth-page hidden">
     <div class="auth-logo">bapX</div>
     <div class="auth-card">
       <h1>Create <span>account</span></h1>
-      <p class="subtitle">Join bapX.</p>
-      <button class="btn btn-block oauth-btn" onclick="googleSignup()" style="border:1px solid var(--border);background:var(--bg);color:var(--fg);margin-bottom:1rem">
-        <svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:middle;margin-right:8px"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+      <p class="auth-subtitle">Join bapX</p>
+      <button class="btn btn-block btn-google" onclick="googleSignup()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
         Sign up with Google
       </button>
-      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;color:var(--muted);font-size:.75rem"><hr style="flex:1;border:none;border-top:1px solid var(--border)"><span>or email</span><hr style="flex:1;border:none;border-top:1px solid var(--border)"></div>
+      <div class="divider"><span>or email</span></div>
       <div class="field"><label>Username</label><input id="su-username" placeholder="yourname" autocomplete="username"></div>
       <div class="field"><label>Full Name</label><input id="su-name" placeholder="Your Name" autocomplete="name"></div>
       <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@email.com" autocomplete="email"></div>
       <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="8+ characters" autocomplete="new-password"></div>
       <div class="field"><label>Age</label><input id="su-age" placeholder="Optional"></div>
-      <!-- Agent Name removed -->
-      <div class="field"><label>Bio</label><textarea id="su-bio" placeholder="Optional bio..." rows="2"></textarea></div>
-      <button class="btn btn-block" id="signup-btn" onclick="doSignup()">Create Account</button>
-      <div class="error-msg" id="signup-error"></div>
-      <div class="auth-footer">Already have an account? <a href="#" onclick="return navigateTo('login')">Sign In</a></div>
+      <div class="field"><label>Bio</label><textarea id="su-bio" placeholder="Optional" rows="2"></textarea></div>
+      <button class="btn btn-block" onclick="doSignup()">Create Account</button>
+      <div class="msg error" id="signup-error"></div>
+      <div class="auth-footer">Already have an account? <a href="#" onclick="return showPage('login')">Sign In</a></div>
     </div>
   </div>
 
   <!-- DASHBOARD -->
-  <div id="page-dashboard" class="hidden app" style="width:100%;height:100vh">
-    <!-- Backdrop for mobile -->
-    <div class="backdrop" id="backdrop" onclick="closeMobileSidebar()"></div>
+  <div id="page-dashboard" class="hidden app">
+    <div class="backdrop" onclick="closeLeftSidebar()"></div>
 
-    <!-- Sidebar -->
-    <div class="sidebar sidebar-desktop" id="sidebar">
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-logo" id="sidebar-logo">bapX</div>
+        <button class="sidebar-logo" onclick="toggleLeftSidebar()">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          <span class="sidebar-logo-text">bapX</span>
+        </button>
       </div>
-      <nav class="sidebar-nav">
-        <button class="nav-item active" onclick="switchView('chat')" id="nav-chat">
-          <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </span>
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <button class="nav-item active" data-view="chat" onclick="switchView('chat')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span class="nav-label">Chat</span>
         </button>
-        <button class="nav-item" onclick="switchView('settings')" id="nav-settings">
-          <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </span>
-          <span class="nav-label">Settings</span>
+        <button class="nav-item" data-view="projects" onclick="switchView('projects')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span class="nav-label">Projects</span>
         </button>
-        <button class="nav-item" onclick="switchView('skills')" id="nav-skills">
-          <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          </span>
+        <button class="nav-item" data-view="skills" onclick="switchView('skills')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           <span class="nav-label">Skills</span>
         </button>
+        <button class="nav-item" data-view="settings" onclick="switchView('settings')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="nav-label">Settings</span>
+        </button>
       </nav>
-      <div class="sidebar-user" id="sidebar-user" onclick="switchView('settings')">
+      <div class="sidebar-user" onclick="switchView('settings')">
         <div class="avatar" id="sidebar-avatar">U</div>
-        <span class="user-name" id="sidebar-username">User</span>
+        <span class="nav-label user-name" id="sidebar-username">User</span>
       </div>
-    </div>
+    </aside>
 
-    <!-- Main Content -->
-    <div class="main-content">
-      <!-- Chat Area -->
-      <div class="chat-area" id="chat-area">
-        <div class="chat-header">
-          <div style="display:flex;align-items:center;gap:8px">
-            <button class="hamburger" id="hamburger" onclick="toggleMobileSidebar()">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    <!-- MAIN -->
+    <main class="main-content">
+      <!-- ===== CHAT VIEW ===== -->
+      <div id="view-chat" class="view">
+        <header class="chat-header">
+          <div class="chat-header-left">
+            <button class="hamburger" onclick="toggleLeftSidebar()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
-            <span class="chat-header-title" id="chat-title">New Chat</span>
+            <span class="chat-title" id="chat-title">New Chat</span>
           </div>
-          <div class="sesh-row">
-            <select id="session-select" onchange="switchSession(this.value)">
-              <option value="">New Chat</option>
-            </select>
-            <button class="btn btn-sm btn-ghost" onclick="newSession()" title="New chat">+</button>
+          <div class="chat-header-right">
+            <select id="session-select" onchange="switchSession(this.value)"><option value="">New Chat</option></select>
+            <button class="btn-icon" onclick="newSession()" title="New chat">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button class="btn-icon rp-toggle" onclick="toggleRightPanel()" title="Toggle panel">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            </button>
           </div>
-        </div>
+        </header>
         <div class="chat-messages" id="chat-messages">
           <div class="empty-state">
-            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <h3>Start a conversation</h3>
-            <p>Send a message to begin chatting with your AI agent.</p>
+            <p>Send a message to begin chatting with your agent.</p>
           </div>
         </div>
         <div class="chat-input-area">
           <textarea class="chat-input" id="chat-input" placeholder="Type a message..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-          <button class="chat-send-btn" id="send-btn" onclick="sendMessage()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <button class="btn-send" id="send-btn" onclick="sendMessage()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
       </div>
 
-      <!-- Settings View -->
-      <div id="settings-view" class="settings-view hidden">
-        <div class="settings-header">
-          <h2 id="settings-title">Settings</h2>
-          <p id="settings-subtitle">Configure your model connection</p>
-          <div class="settings-tabs">
-            <button class="st-tab active" data-stab="connection" onclick="switchSettingsTab('connection')">Connection</button>
-            <button class="st-tab" data-stab="skills" onclick="switchSettingsTab('skills')">Skills</button>
+      <!-- ===== PROJECTS VIEW ===== -->
+      <div id="view-projects" class="view hidden">
+        <header class="view-header">
+          <h2>Projects</h2>
+          <button class="btn btn-sm" onclick="createProject()">+ New Project</button>
+        </header>
+        <div class="view-body" id="projects-list">
+          <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <h3>No projects yet</h3>
+            <p>Create a project to organize your work.</p>
           </div>
         </div>
-        <div class="settings-body">
-          <!-- Connection Tab -->
-          <div id="stab-connection">
-            <div class="settings-section">
-              <h3>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      </div>
+
+      <!-- ===== SKILLS VIEW ===== -->
+      <div id="view-skills" class="view hidden">
+        <header class="view-header">
+          <h2>Skills</h2>
+          <span class="badge" id="skills-count"></span>
+        </header>
+        <div class="view-body">
+          <input class="search-bar" id="skills-search" placeholder="Search skills..." oninput="renderSkills()">
+          <div class="skills-grid" id="skills-grid"></div>
+          <div class="view-actions">
+            <button class="btn" onclick="saveSkills()">Save Skills</button>
+          </div>
+          <div class="msg success" id="skills-success"></div>
+        </div>
+      </div>
+
+      <!-- ===== SETTINGS VIEW ===== -->
+      <div id="view-settings" class="view hidden">
+        <header class="view-header">
+          <h2>Settings</h2>
+          <p class="view-subtitle">Configure your account and connections</p>
+        </header>
+        <div class="settings-tabs">
+          <button class="st-tab active" data-tab="connection" onclick="switchSettingsTab('connection')">Connection</button>
+          <button class="st-tab" data-tab="skills">Skills</button>
+          <button class="st-tab" data-tab="account">Account</button>
+        </div>
+        <div class="view-body">
+          <!-- Connection -->
+          <div class="stab-content active" id="stab-connection">
+            <section class="settings-section">
+              <h3 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
                 Connected Provider
               </h3>
-              <div class="conn-card">
-                <div class="conn-avatar connected" id="conn-avatar">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <div class="conn-card" id="conn-card">
+                <div class="conn-icon" id="conn-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 </div>
                 <div class="conn-info">
-                  <h4 id="active-provider-label">None</h4>
-                  <p id="active-provider-detail">No provider connected</p>
+                  <div class="conn-name" id="conn-name">None</div>
+                  <div class="conn-detail" id="conn-detail">No provider connected</div>
                 </div>
-                <span class="conn-status disconnected" id="active-provider-status">
+                <span class="conn-badge disconnected" id="conn-badge">
                   <span class="dot"></span> Not connected
                 </span>
               </div>
 
-              <h3 style="margin-top:1.5rem">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <h3 class="section-title" style="margin-top:1.5rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 API Key Provider
               </h3>
               <div class="prov-form">
-                <div class="field">
-                  <label>Provider</label>
-                  <select id="provider-select" onchange="updateModels()">
-                    <option value="">Select...</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label>Model</label>
-                  <select id="model-select">
-                    <option value="">Select...</option>
-                  </select>
-                </div>
-                <div class="field full">
-                  <label>API Key</label>
-                  <input id="api-key-input" type="password" placeholder="sk-..." autocomplete="off">
-                </div>
+                <div class="field"><label>Provider</label><select id="provider-select" onchange="updateModels()"><option value="">Select...</option></select></div>
+                <div class="field"><label>Model</label><select id="model-select"><option value="">Select...</option></select></div>
+                <div class="field full"><label>API Key</label><input id="api-key-input" type="password" placeholder="sk-..." autocomplete="off"></div>
                 <button class="btn" onclick="saveApiKey()">Connect</button>
               </div>
-              <div class="error-msg" id="apikey-error" style="margin-top:.75rem"></div>
-              <div class="success-msg" id="apikey-success" style="margin-top:.75rem"></div>
+              <div class="msg error" id="apikey-error"></div>
+              <div class="msg success" id="apikey-success"></div>
 
-              <h3 style="margin-top:1.5rem">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <h3 class="section-title" style="margin-top:1.5rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 Connect via OAuth
               </h3>
               <div class="oauth-grid" id="oauth-providers"></div>
-            </div>
+            </section>
           </div>
 
           <!-- Skills Tab -->
-          <div id="stab-skills" class="hidden">
-            <div class="settings-section" id="skills-section">
-              <h3>Skills
-                <span style="font-size:.75rem;font-weight:400;color:var(--muted)" id="skills-count"></span>
+          <div class="stab-content" id="stab-skills">
+            <section class="settings-section">
+              <h3 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                Enabled Skills <span id="skills-count-inline"></span>
               </h3>
-              <input class="search-bar" id="skills-search" placeholder="Search skills..." oninput="renderSkills()">
-              <div class="skills-grid" id="skills-grid"></div>
-              <div style="margin-top:1rem;display:flex;justify-content:flex-end">
-                <button class="btn" onclick="saveSkills()">Save Skills</button>
+              <input class="search-bar" id="skills-settings-search" placeholder="Search skills..." oninput="renderSettingsSkills()">
+              <div class="skills-grid" id="settings-skills-grid"></div>
+              <button class="btn" onclick="saveSkills()">Save Skills</button>
+              <div class="msg success" id="skills-settings-success"></div>
+            </section>
+          </div>
+
+          <!-- Account Tab -->
+          <div class="stab-content" id="stab-account">
+            <section class="settings-section">
+              <h3 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Profile
+              </h3>
+              <div class="profile-fields">
+                <div class="field"><label>Name</label><input id="prof-name" placeholder="Your Name"></div>
+                <div class="field"><label>Username</label><input id="prof-username" disabled></div>
+                <div class="field"><label>Email</label><input id="prof-email" disabled></div>
+                <div class="field"><label>Bio</label><textarea id="prof-bio" rows="2"></textarea></div>
+                <button class="btn" onclick="saveProfile()">Save Profile</button>
+                <div class="msg success" id="profile-success"></div>
               </div>
-              <div class="success-msg" id="skills-success" style="margin-top:.5rem"></div>
-            </div>
+            </section>
+            <section class="settings-section">
+              <h3 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Billing
+              </h3>
+              <div id="billing-info">
+                <p style="color:var(--muted);font-size:.875rem">Loading...</p>
+              </div>
+            </section>
+            <section class="settings-section">
+              <h3 class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                Danger Zone
+              </h3>
+              <button class="btn btn-danger" onclick="if(confirm('Delete account? This cannot be undone.'))deleteAccount()">Delete Account</button>
+            </section>
           </div>
         </div>
       </div>
+    </main>
 
-      <!-- Resizer -->
-      <div class="resizer" id="resizer" onmousedown="startResize(event)"></div>
+    <!-- RESIZER -->
+    <div class="resizer" onmousedown="startResize(event)"></div>
 
-      <!-- Right Panel -->
-      <div class="right-panel" id="right-panel">
-        <div class="right-panel-tabs">
-          <button class="rp-tab active" data-tab="canvas" onclick="switchRpTab('canvas')">Canvas</button>
-          <button class="rp-tab" data-tab="browser" onclick="switchRpTab('browser')">Browser</button>
-          <button class="rp-tab" data-tab="terminal" onclick="switchRpTab('terminal')">Terminal</button>
+    <!-- RIGHT PANEL -->
+    <aside class="right-panel collapsed" id="right-panel">
+      <div class="rp-tabs">
+        <button class="rp-tab active" data-tab="canvas" onclick="switchRpTab('canvas')">Canvas</button>
+        <button class="rp-tab" data-tab="browser" onclick="switchRpTab('browser')">Browser</button>
+        <button class="rp-tab" data-tab="terminal" onclick="switchRpTab('terminal')">Terminal</button>
+      </div>
+      <div class="rp-status" id="rp-status">
+        <span class="sb-dot idle"></span>
+        <span class="sb-label">Sandbox — Stopped</span>
+      </div>
+      <div class="rp-content" id="rp-content">
+        <div class="rp-placeholder" data-tab="canvas">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          <span>Canvas</span>
+          <span class="rp-desc">Visual output workspace</span>
         </div>
-        <div class="sandbox-bar sb-none" id="sandbox-bar">
-          <span class="sb-dot"></span>
-          <span class="sb-status" id="sandbox-status-label">Sandbox — Stopped</span>
-          <button class="sb-btn sb-start" id="sandbox-toggle-btn" onclick="toggleSandbox()">Start</button>
+        <div class="rp-placeholder hidden" data-tab="browser">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>Browser</span>
+          <span class="rp-desc">Web browsing sandbox</span>
         </div>
-        <div class="right-panel-content" id="rp-content">
-          <div class="rp-placeholder" data-tab="canvas">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-            <span>Canvas</span>
-            <span style="font-size:.75rem">Visual output workspace</span>
-          </div>
-          <div class="rp-placeholder hidden" data-tab="browser">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            <span>Browser</span>
-            <span style="font-size:.75rem">Web browsing sandbox</span>
-          </div>
-          <div class="rp-placeholder hidden" data-tab="terminal">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-            <span>Terminal</span>
-            <span style="font-size:.75rem">Live CLI output</span>
-          </div>
+        <div class="rp-placeholder hidden" data-tab="terminal">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>Terminal</span>
+          <span class="rp-desc">Command-line access</span>
         </div>
       </div>
-    </div>
+    </aside>
   </div>
 </div>
 
-<script>
-// ── Globals ──
-const API = window.location.origin;
-let currentUser = null;
-let currentSessionId = null;
-let oauthFlowPolling = null;
-let enabledSkills = [];
-let allSkills = [];
-let allProviders = {api_key:[],oauth:[],copilot:[]};
+<!-- OAuth Modal -->
+<div class="modal-overlay hidden" id="oauth-modal" onclick="if(event.target===this)closeOAuthModal()">
+  <div class="modal">
+    <h3 id="oauth-modal-title">Connect Provider</h3>
+    <p id="oauth-modal-desc">Visit the URL below and enter the code</p>
+    <div class="oauth-code" id="oauth-user-code">ABCD-1234</div>
+    <div class="oauth-url" id="oauth-verify-url">https://...</div>
+    <div class="spinner" id="oauth-spinner"></div>
+    <p class="msg info" id="oauth-status">Waiting for authorization...</p>
+    <button class="btn btn-ghost" onclick="closeOAuthModal()">Cancel</button>
+  </div>
+</div>
 
-// ── Routing ──
-function navigateTo(page){
-  window.location.hash = page;
-  return false;
-}
-
-function showPage(page){
-  location.hash || (location.hash = page);
-  document.querySelectorAll('#page-login,#page-signup,#page-dashboard').forEach(el => el.classList.add('hidden'));
-  document.getElementById('page-' + page).classList.remove('hidden');
-  if(page === 'dashboard') initDashboard();
-}
-
-window.addEventListener('hashchange', function(){
-  const hash = location.hash.replace('#','') || 'login';
-  if(['login','signup','dashboard'].includes(hash)){
-    document.querySelectorAll('#page-login,#page-signup,#page-dashboard').forEach(el => el.classList.add('hidden'));
-    document.getElementById('page-' + hash).classList.remove('hidden');
-    if(hash === 'dashboard') initDashboard();
-  }
-});
-
-window.addEventListener('load', function(){
-  const token = localStorage.getItem('bapx_token');
-  const hash = location.hash.replace('#','') || 'login';
-  if(token && hash === 'dashboard'){ showPage('dashboard'); }
-  else { showPage(hash); }
-});
-
-function getToken(){ return localStorage.getItem('bapx_token') }
-
-async function api(method, path, body){
-  const opts = {method, headers:{'Content-Type':'application/json'}};
-  if(body) opts.body = JSON.stringify(body);
-  const token = getToken();
-  if(token) opts.headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(API + path, opts);
-  if(res.status===401 && path!=='/api/login' && path!=='/api/signup'){
-    localStorage.removeItem('bapx_token');
-    showPage('login');
-    throw new Error('Session expired');
-  }
-  // SSE endpoints return raw response
-  if(path === '/api/chat/send' || path === '/api/agent/run') return res;
-  const data = await res.json();
-  if(!res.ok) throw new Error(data.detail || 'Request failed');
-  return data;
-}
-
-// ── Auth ──
-async function doLogin(){
-  const email = document.getElementById('login-email').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  const err = document.getElementById('login-error');
-  if(!email||!pass){ err.textContent='Fill all fields'; err.style.display='block'; return }
-  try{
-    document.getElementById('login-btn').disabled = true;
-    const data = await api('POST','/api/login',{email,password:pass});
-    localStorage.setItem('bapx_token', data.token);
-    err.style.display='none';
-    window.location.hash = 'dashboard';
-    showPage('dashboard');
-  }catch(e){ err.textContent=e.message; err.style.display='block' }
-  finally{ document.getElementById('login-btn').disabled = false }
-}
-
-async function googleSignup(){
-  try{
-    // Redirect to Google OAuth from admin config
-    var cfg = await api('GET','/api/admin/config/check/google_oauth_client_id');
-    if(!cfg.configured){
-      alert('Google sign-in is not configured yet. Please sign up with email instead.');
-      return;
-    }
-    // Store intent and redirect
-    localStorage.setItem('bapx_oauth_intent', 'signup');
-    window.location.href = '/api/auth/google/login';
-  }catch(e){ alert('Google sign-in unavailable'); }
-}
-
-async function doSignup(){
-  const username = document.getElementById('su-username').value.trim();
-  const name = document.getElementById('su-name').value.trim();
-  const email = document.getElementById('su-email').value.trim();
-  const pass = document.getElementById('su-pass').value;
-  const err = document.getElementById('signup-error');
-  if(!username||!name||!email||!pass){ err.textContent='Fill required fields'; err.style.display='block'; return }
-  try{
-    document.getElementById('signup-btn').disabled = true;
-    const data = await api('POST','/api/signup',{
-      username, name, email, password: pass,
-      age: document.getElementById('su-age').value,
-      agent_name: '',
-      bio: document.getElementById('su-bio').value,
-    });
-    localStorage.setItem('bapx_token', data.token);
-    err.style.display='none';
-    window.location.hash = 'dashboard';
-    showPage('dashboard');
-  }catch(e){ err.textContent=e.message; err.style.display='block' }
-  finally{ document.getElementById('signup-btn').disabled = false }
-}
-
-// ── Dashboard Init ──
-let currentView = 'chat';
-
-async function initDashboard(){
-  if(currentUser) return;
-  try{
-    const data = await api('GET','/api/user/profile');
-    currentUser = data;
-    const initial = (data.name||data.username||'U')[0].toUpperCase();
-    document.getElementById('sidebar-avatar').textContent = initial;
-    document.getElementById('sidebar-username').textContent = data.username || data.name;
-    loadProviders();
-    loadSessions();
-    loadSkills();
-    loadOAuthStatus();
-    updateConnectionDisplay();
-  }catch(e){
-    localStorage.removeItem('bapx_token');
-    showPage('login');
-  }
-}
-
-function switchView(view){
-  currentView = view;
-  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active') });
-  var navMap = {chat:'nav-chat',settings:'nav-settings',skills:'nav-skills'};
-  if(navMap[view]) document.getElementById(navMap[view]).classList.add('active');
-
-  var chatArea = document.getElementById('chat-area');
-  var settingsView = document.getElementById('settings-view');
-
-  chatArea.classList.remove('hidden');
-  chatArea.style.display = '';
-  settingsView.classList.add('hidden');
-
-  if(view === 'chat'){
-    chatArea.style.display = 'flex';
-    closeMobileSidebar();
-  } else {
-    chatArea.style.display = 'none';
-    settingsView.classList.remove('hidden');
-
-    if(view === 'settings'){
-      document.getElementById('settings-title').textContent = 'Settings';
-      document.getElementById('settings-subtitle').textContent = 'Configure your model connection';
-      switchSettingsTab('connection');
-      loadOAuthStatus();
-    } else if(view === 'skills'){
-      document.getElementById('settings-title').textContent = 'Skills';
-      document.getElementById('settings-subtitle').textContent = 'Browse and enable agent skills';
-      switchSettingsTab('skills');
-      renderSkills();
-    }
-    closeMobileSidebar();
-  }
-}
-
-function switchSettingsTab(tab){
-  document.querySelectorAll('.st-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.stab === tab) });
-  document.getElementById('stab-connection').classList.toggle('hidden', tab !== 'connection');
-  document.getElementById('stab-skills').classList.toggle('hidden', tab !== 'skills');
-  if(tab === 'skills') renderSkills();
-}
-
-// ── Providers ──
-async function loadProviders(){
-  try{
-    const data = await api('GET','/api/providers');
-    allProviders = data;
-    var sel = document.getElementById('provider-select');
-    sel.innerHTML = '<option value="">Select provider...</option>';
-
-    // Add API key providers group
-    if(data.api_key && data.api_key.length){
-      var grp = document.createElement('optgroup');
-      grp.label = '── API Key ──';
-      data.api_key.forEach(function(p){
-        var o = document.createElement('option');
-        o.value = p.id; o.textContent = p.name;
-        grp.appendChild(o);
-      });
-      sel.appendChild(grp);
-    }
-
-    // Render OAuth providers
-    renderOAuthProviders([]);
-  }catch(e){
-    console.error('Failed to load providers', e);
-  }
-}
-
-async function updateModels(){
-  var sel = document.getElementById('provider-select');
-  var modelSel = document.getElementById('model-select');
-  var keyInput = document.getElementById('api-key-input');
-  var prov = (allProviders.api_key || []).find(function(p){ return p.id === sel.value });
-  modelSel.innerHTML = '<option value="">Select model...</option>';
-
-  // First try cached models from user profile
-  if(currentUser && currentUser.cached_models && currentUser.cached_models.length > 0 && currentUser.provider === sel.value){
-    currentUser.cached_models.forEach(function(m){
-      var o = document.createElement('option');
-      o.value = m; o.textContent = m;
-      modelSel.appendChild(o);
-    });
-    return;
-  }
-
-  // Fallback to hardcoded provider models
-  if(prov && prov.models){
-    prov.models.forEach(function(m){
-      var o = document.createElement('option');
-      o.value = m; o.textContent = m;
-      modelSel.appendChild(o);
-    });
-  }
-}
-
-async function saveApiKey(){
-  var provider = document.getElementById('provider-select').value;
-  var model = document.getElementById('model-select').value;
-  var key = document.getElementById('api-key-input').value;
-  var err = document.getElementById('apikey-error');
-  var succ = document.getElementById('apikey-success');
-  if(!provider||!key){ err.textContent='Select a provider and enter your API key'; err.style.display='block'; succ.style.display='none'; return }
-  try{
-    // First save the API key (without model - we'll fetch models live)
-    await api('PUT','/api/user/api-key',{provider,key,model: model || ''});
-    err.style.display='none';
-    succ.innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;margin-right:6px"></span> Connected! Fetching available models...';
-    succ.style.display='block';
-
-    // Now fetch models dynamically from the provider
-    var modelsResp = await api('POST','/api/providers/fetch-models',{provider,key});
-    var fetchedModels = modelsResp.models || [];
-
-    // Update model dropdown with live data
-    var modelSel = document.getElementById('model-select');
-    modelSel.innerHTML = '<option value="">Select model...</option>';
-    fetchedModels.forEach(function(m){
-      var o = document.createElement('option');
-      o.value = m; o.textContent = m;
-      modelSel.appendChild(o);
-    });
-
-    if(modelsResp.source === 'live'){
-      succ.textContent = 'Connected! ' + fetchedModels.length + ' models loaded from provider. Select one.';
-    } else {
-      succ.textContent = 'Connected! Using default model list (live fetch unavailable).';
-    }
-
-    var data = await api('GET','/api/user/profile');
-    currentUser = data;
-    updateConnectionDisplay();
-  }catch(e){ err.textContent=e.message; err.style.display='block'; succ.style.display='none' }
-}
-
-function updateConnectionDisplay(){
-  if(!currentUser) return;
-  var label = document.getElementById('active-provider-label');
-  var detail = document.getElementById('active-provider-detail');
-  var status = document.getElementById('active-provider-status');
-  var avatar = document.getElementById('conn-avatar');
-  if(currentUser.api_key && currentUser.api_key !== ''){
-    var provName = currentUser.provider || 'API Key';
-    var provEntry = allProviders.api_key ? allProviders.api_key.find(function(p){ return p.id === provName }) : null;
-    label.textContent = provEntry ? provEntry.name : provName;
-    detail.textContent = 'Connected via API key' + (currentUser.model ? ' \u00b7 ' + currentUser.model : '');
-    status.innerHTML = '<span class="dot"></span> Connected';
-    status.className = 'conn-status connected';
-    avatar.className = 'conn-avatar connected';
-  } else if(currentUser.oauth_provider || (currentUser.oauth_tokens && Object.keys(currentUser.oauth_tokens).length > 0)){
-    var oName = currentUser.oauth_provider || Object.keys(currentUser.oauth_tokens)[0];
-    var oEntry = allProviders.oauth ? allProviders.oauth.find(function(p){ return p.id === oName }) : null;
-    label.textContent = oEntry ? oEntry.name : oName;
-    detail.textContent = 'Connected via OAuth';
-    status.innerHTML = '<span class="dot"></span> Connected';
-    status.className = 'conn-status connected';
-    avatar.className = 'conn-avatar connected';
-  } else {
-    label.textContent = 'None';
-    detail.textContent = 'No provider connected';
-    status.innerHTML = '<span class="dot"></span> Not connected';
-    status.className = 'conn-status disconnected';
-    avatar.className = 'conn-avatar disconnected';
-  }
-}
-
-// ── OAuth ──
-async function loadOAuthStatus(){
-  try{
-    var data = await api('GET','/api/auth/oauth/status');
-    renderOAuthProviders(data.connected_providers || []);
-  }catch(e){}
-}
-
-function renderOAuthProviders(connected){
-  var container = document.getElementById('oauth-providers');
-  container.innerHTML = '';
-  var allList = [].concat(allProviders.oauth||[], allProviders.copilot||[]);
-  if(allList.length === 0){
-    container.innerHTML = '<p style="font-size:.8125rem;color:var(--muted);text-align:center;padding:1.5rem">Loading providers...</p>';
-    return;
-  }
-  allList.forEach(function(p){
-    var card = document.createElement('div');
-    card.className = 'oauth-card';
-    var isConn = connected.indexOf(p.id) !== -1;
-    var initial = (p.name||'?')[0].toUpperCase();
-    var colors = ['#9651b8','#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#84cc16','#d946ef'];
-    var colorIdx = allList.indexOf(p) % colors.length;
-    card.innerHTML =
-      '<div class="provider-icon" style="background:rgba(' + hexToRgb(colors[colorIdx]) + ',0.12);color:' + colors[colorIdx] + '">' + initial + '</div>' +
-      '<h4>' + p.name + '</h4>' +
-      '<p>' + (p.models ? p.models.slice(0,2).join(', ') : '') + '</p>' +
-      (isConn
-        ? '<span class="badge-conn">Connected</span>'
-        : '<button class="btn btn-sm btn-ghost" onclick="startOAuth(\'' + p.id + '\')">Connect</button>');
-    container.appendChild(card);
-  });
-}
-
-function hexToRgb(hex){
-  var r = parseInt(hex.slice(1,2),16)*17;
-  var g = parseInt(hex.slice(2,3),16)*17;
-  var b = parseInt(hex.slice(3,4),16)*17;
-  for(var i=1;i<3;i++){
-    if(hex.length > 4+i*2){ r=parseInt(hex.slice(1,3),16); g=parseInt(hex.slice(3,5),16); b=parseInt(hex.slice(5,7),16); break; }
-  }
-  return r+','+g+','+b;
-}
-
-async function startOAuth(provider){
-  try{
-    var data = await api('POST','/api/auth/oauth/start',{provider: provider});
-    showOAuthModal(data);
-  }catch(e){ alert(e.message) }
-}
-
-function showOAuthModal(data){
-  var existing = document.querySelector('.modal-overlay');
-  if(existing) existing.remove();
-
-  var overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML =
-    '<div class="modal">' +
-      '<h3>Connect ' + (data.provider_name||'Provider') + '</h3>' +
-      '<p>Open the URL below and enter the code to authorize.</p>' +
-      '<div class="code">' + (data.user_code||'------') + '</div>' +
-      '<p class="url">' + (data.verification_uri||'') + '</p>' +
-      '<div style="margin-top:1rem;display:flex;align-items:center;justify-content:center;gap:8px">' +
-        '<div class="spinner"></div>' +
-        '<span style="font-size:.875rem;color:var(--muted)" class="pulse">Waiting for authorization...</span>' +
-      '</div>' +
-      '<div style="margin-top:1rem;display:flex;gap:8px;justify-content:center">' +
-        '<button class="btn btn-sm btn-ghost" onclick="copyOAuthCode()">Copy Code</button>' +
-        '<button class="btn btn-sm btn-ghost" onclick="cancelOAuth()">Cancel</button>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(overlay);
-  window._oauthFlowId = data.flow_id;
-  pollOAuth(data.flow_id);
-}
-
-function copyOAuthCode(){
-  var code = document.querySelector('.modal .code');
-  if(!code) return;
-  if(navigator.clipboard){
-    navigator.clipboard.writeText(code.textContent);
-    var orig = code.textContent;
-    code.textContent = 'Copied!';
-    code.style.color = '#22c55e';
-    setTimeout(function(){
-      code.textContent = orig;
-      code.style.color = '';
-    }, 1500);
-  }
-}
-
-async function pollOAuth(flowId){
-  oauthFlowPolling = setInterval(async function(){
-    try{
-      var data = await api('POST','/api/auth/oauth/poll',{flow_id: flowId});
-      if(data.status === 'completed'){
-        clearInterval(oauthFlowPolling);
-        var overlay = document.querySelector('.modal-overlay');
-        if(overlay) overlay.remove();
-        loadOAuthStatus();
-        var data2 = await api('GET','/api/user/profile');
-        currentUser = data2;
-        updateConnectionDisplay();
-      } else if(data.status === 'expired' || data.status === 'denied'){
-        clearInterval(oauthFlowPolling);
-        var overlay = document.querySelector('.modal-overlay');
-        if(overlay) overlay.remove();
-        alert('Authorization ' + data.status);
-      }
-    }catch(e){}
-  }, 3000);
-}
-
-function cancelOAuth(){
-  if(oauthFlowPolling) clearInterval(oauthFlowPolling);
-  var overlay = document.querySelector('.modal-overlay');
-  if(overlay) overlay.remove();
-}
-
-// ── Skills ──
-async function loadSkills(){
-  try{
-    var data = await api('GET','/api/user/skills');
-    allSkills = data.available || [];
-    enabledSkills = data.enabled || [];
-    renderSkills();
-  }catch(e){}
-}
-
-function renderSkills(){
-  var query = (document.getElementById('skills-search').value || '').toLowerCase();
-  var filtered = allSkills.filter(function(s){
-    return s.name.toLowerCase().indexOf(query) !== -1 ||
-           (s.description||'').toLowerCase().indexOf(query) !== -1 ||
-           (s.category||'').toLowerCase().indexOf(query) !== -1;
-  });
-  var grid = document.getElementById('skills-grid');
-  grid.innerHTML = '';
-  if(filtered.length === 0){
-    grid.innerHTML = '<p style="color:var(--muted);font-size:.875rem;text-align:center;padding:2rem">No skills match your search.</p>';
-    return;
-  }
-  filtered.forEach(function(s){
-    var card = document.createElement('div');
-    card.className = 'skill-card';
-    var isEnabled = enabledSkills.indexOf(s.name) !== -1;
-    var catClass = s.category || 'general';
-    card.innerHTML =
-      '<span class="cat-badge">' + catClass + '</span>' +
-      '<h4>' + escapeHtml(s.name) + '</h4>' +
-      '<p>' + escapeHtml(s.description||'No description') + '</p>' +
-      '<div class="toggle-wrap">' +
-        '<label class="toggle">' +
-          '<input type="checkbox" ' + (isEnabled?'checked':'') + ' onchange="toggleSkill(\'' + escapeAttr(s.name) + '\')">' +
-          '<span class="toggle-slider"></span>' +
-        '</label>' +
-        '<span style="font-size:.75rem;color:var(--muted)">' + (isEnabled?'Enabled':'Disabled') + '</span>' +
-      '</div>';
-    grid.appendChild(card);
-  });
-  document.getElementById('skills-count').textContent = enabledSkills.length + ' of ' + allSkills.length + ' enabled';
-}
-
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] }) }
-function escapeAttr(s){ return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;') }
-
-function toggleSkill(name){
-  var idx = enabledSkills.indexOf(name);
-  if(idx > -1) enabledSkills.splice(idx, 1);
-  else enabledSkills.push(name);
-  renderSkills();
-}
-
-async function saveSkills(){
-  try{
-    await api('POST','/api/user/skills',{skills: enabledSkills});
-    var succ = document.getElementById('skills-success');
-    succ.textContent = 'Skills saved successfully!';
-    succ.style.display = 'block';
-    setTimeout(function(){ succ.style.display='none' }, 3000);
-  }catch(e){ alert(e.message) }
-}
-
-// ── Chat ──
-async function sendMessage(){
-  var input = document.getElementById('chat-input');
-  var msg = input.value.trim();
-  if(!msg) return;
-  input.value = '';
-  input.style.height = 'auto';
-
-  var container = document.getElementById('chat-messages');
-  var empty = container.querySelector('.empty-state');
-  if(empty) empty.remove();
-
-  addMessage(msg, 'user');
-
-  var msgDiv = document.createElement('div');
-  msgDiv.className = 'chat-msg assistant';
-  msgDiv.innerHTML = '<div class="spinner"></div>';
-  container.appendChild(msgDiv);
-  container.scrollTop = container.scrollHeight;
-
-  document.getElementById('send-btn').disabled = true;
-
-  try{
-    // Use the agent runtime (OpenAI Agents SDK + Codex)
-    var res = await api('POST','/api/agent/run',{message: msg, session_id: currentSessionId});
-    var reader = res.body.getReader();
-    var decoder = new TextDecoder();
-    var fullText = '';
-    msgDiv.innerHTML = '';
-    var hasContent = false;
-
-    while(true){
-      var result = await reader.read();
-      if(result.done) break;
-      var text = decoder.decode(result.value);
-      var lines = text.split('\n');
-      for(var i=0; i<lines.length; i++){
-        var line = lines[i];
-        if(line.startsWith('data: ')){
-          var data = line.slice(6).trim();
-          if(data === '[DONE]') break;
-          try{
-            var parsed = JSON.parse(data);
-            if(parsed.error){
-              msgDiv.innerHTML = '<span style="color:#ef4444">Error: ' + escapeHtml(parsed.error) + '</span>';
-              break;
-            }
-            if(parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content){
-              fullText += parsed.choices[0].delta.content;
-              hasContent = true;
-              msgDiv.innerHTML = marked(fullText);
-            }
-            // Agent runtime format (OpenAI Agents SDK)
-            if(parsed.text){
-              fullText += parsed.text;
-              hasContent = true;
-              msgDiv.innerHTML = marked(fullText);
-            }
-            if(parsed.final && !hasContent){
-              fullText = parsed.final;
-              hasContent = true;
-              msgDiv.innerHTML = marked(fullText);
-            }
-            // Tool call indicator
-            if(parsed.tool_call){
-              var tc = '<div style="font-size:.75rem;color:var(--accent);padding:.25rem 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg> Using tool: ' + escapeHtml(parsed.tool_call.name || 'unknown') + '...</div>';
-              if(!hasContent) msgDiv.innerHTML = tc;
-            }
-          }catch(e){
-            if(data && !hasContent){
-              msgDiv.textContent = data;
-              hasContent = true;
-            }
-          }
-        }
-      }
-      container.scrollTop = container.scrollHeight;
-    }
-    if(!fullText && !hasContent) msgDiv.textContent = '(empty response)';
-    // Add TTS speaker icon to assistant message
-    var ttsBtn = document.createElement('button');
-    ttsBtn.className = 'tts-btn';
-    ttsBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
-    ttsBtn.title = 'Play as speech';
-    ttsBtn.onclick = function(e){
-      e.stopPropagation();
-      playTTS(fullText);
-    };
-    msgDiv.appendChild(ttsBtn);
-    var sid = res.headers.get('X-Session-Id');
-    if(sid){ currentSessionId = sid; loadSessions(); }
-  }catch(e){
-    msgDiv.innerHTML = '<span style="color:#ef4444">Error: ' + escapeHtml(e.message) + '</span>';
-  }
-  document.getElementById('send-btn').disabled = false;
-}
-
-function addMessage(text, role){
-  var container = document.getElementById('chat-messages');
-  var empty = container.querySelector('.empty-state');
-  if(empty) empty.remove();
-  var div = document.createElement('div');
-  div.className = 'chat-msg ' + role;
-  if(role === 'assistant' || role === 'user'){
-    div.innerHTML = marked(text);
-  } else {
-    div.textContent = text;
-  }
-  if(role === 'assistant'){
-    var ttsBtn = document.createElement('button');
-    ttsBtn.className = 'tts-btn';
-    ttsBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
-    ttsBtn.title = 'Play as speech';
-    ttsBtn.onclick = function(e){ e.stopPropagation(); playTTS(text); };
-    div.appendChild(ttsBtn);
-  }
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
-}
-
-// ── TTS ──
-async function playTTS(text){
-  try{
-    var res = await fetch(API + '/api/tts', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text: text}),
-    });
-    if(!res.ok) throw new Error('TTS failed');
-    var blob = await res.blob();
-    var url = URL.createObjectURL(blob);
-    var audio = new Audio(url);
-    audio.onended = function(){ URL.revokeObjectURL(url); };
-    audio.play();
-  }catch(e){
-    console.error('TTS error:', e);
-  }
-}
-
-function marked(text){
-  if(!text) return '';
-  var html = text
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br>');
-  return html;
-}
-
-// ── Sessions ──
-async function loadSessions(){
-  try{
-    var data = await api('GET','/api/sessions');
-    var sel = document.getElementById('session-select');
-    sel.innerHTML = '<option value="">New Chat</option>';
-    (data.sessions||[]).forEach(function(s){
-      var o = document.createElement('option');
-      o.value = s.id;
-      o.textContent = s.title ? (s.title.length > 30 ? s.title.slice(0,30)+'\u2026' : s.title) : 'Chat ' + s.id.slice(0,8);
-      if(s.id === currentSessionId) o.selected = true;
-      sel.appendChild(o);
-    });
-  }catch(e){}
-}
-
-function switchSession(sid){
-  currentSessionId = sid || null;
-  if(!sid){
-    document.getElementById('chat-messages').innerHTML =
-      '<div class="empty-state">' +
-        '<svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
-        '<h3>Start a conversation</h3>' +
-        '<p>Send a message to begin chatting.</p>' +
-      '</div>';
-    document.getElementById('chat-title').textContent = 'New Chat';
-    return;
-  }
-  api('GET','/api/sessions/' + sid).then(function(data){
-    var container = document.getElementById('chat-messages');
-    container.innerHTML = '';
-    var msgs = data.messages || [];
-    if(msgs.length === 0){
-      container.innerHTML = '<div class="empty-state"><h3>Empty session</h3></div>';
-    } else {
-      msgs.forEach(function(m){ addMessage(m.content, m.role) });
-    }
-    document.getElementById('chat-title').textContent = data.title || 'Chat';
-  }).catch(function(){});
-}
-
-function newSession(){
-  currentSessionId = null;
-  document.getElementById('chat-messages').innerHTML =
-    '<div class="empty-state">' +
-      '<svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
-      '<h3>Start a conversation</h3>' +
-      '<p>Send a message to begin chatting.</p>' +
-    '</div>';
-  document.getElementById('chat-title').textContent = 'New Chat';
-  document.getElementById('session-select').value = '';
-}
-
-// ── Right Panel ──
-function switchRpTab(tab){
-  document.querySelectorAll('.rp-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === tab) });
-  document.querySelectorAll('#rp-content > div').forEach(function(d){ d.classList.toggle('hidden', d.dataset.tab !== tab) });
-}
-
-function toggleRightPanel(){
-  var rp = document.getElementById('right-panel');
-  rp.classList.toggle('collapsed');
-  if(window.innerWidth <= 768) rp.classList.toggle('mobile-open');
-}
-
-// ── Resizer ──
-var isResizing = false;
-function startResize(e){
-  isResizing = true;
-  document.getElementById('resizer').classList.add('resizing');
-  document.addEventListener('mousemove', doResize);
-  document.addEventListener('mouseup', stopResize);
-}
-function doResize(e){
-  if(!isResizing) return;
-  var rp = document.getElementById('right-panel');
-  var newWidth = Math.max(200, Math.min(600, window.innerWidth - e.clientX));
-  rp.style.width = newWidth + 'px';
-}
-function stopResize(){
-  isResizing = false;
-  document.getElementById('resizer').classList.remove('resizing');
-  document.removeEventListener('mousemove', doResize);
-  document.removeEventListener('mouseup', stopResize);
-}
-
-// ── Mobile Sidebar ──
-function toggleMobileSidebar(){
-  var sidebar = document.getElementById('sidebar');
-  var backdrop = document.getElementById('backdrop');
-  sidebar.classList.toggle('mobile-expanded');
-  backdrop.classList.toggle('show');
-}
-
-function closeMobileSidebar(){
-  var sidebar = document.getElementById('sidebar');
-  var backdrop = document.getElementById('backdrop');
-  sidebar.classList.remove('mobile-expanded');
-  backdrop.classList.remove('show');
-}
-
-// ── Auto-resize textarea ──
-document.addEventListener('DOMContentLoaded', function(){
-  var chatInput = document.getElementById('chat-input');
-  chatInput.addEventListener('input', function(){
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 150) + 'px';
-  });
-});
-
-// ── Keyboard shortcuts ──
-document.addEventListener('keydown', function(e){
-  if(e.key === 'Escape'){
-    closeMobileSidebar();
-    cancelOAuth();
-  }
-});
-</script>
+<script src="dashboard.js"></script>
 </body>
 </html>
