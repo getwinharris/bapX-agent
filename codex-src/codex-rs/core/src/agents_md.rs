@@ -130,29 +130,6 @@ impl<'a> AgentsMdManager<'a> {
             }
         };
 
-        // ── Auto-inject MEMORY.md + USER.md (Hermes-style persistent memory) ──
-        let memory_dir = self.config.codex_home.join("memories");
-        for memory_file in ["MEMORY.md", "USER.md"] {
-            let memory_path = memory_dir.join(memory_file);
-            if let Ok(false) = fs.is_file(&memory_path) {
-                continue;
-            }
-            match fs.read_to_string(&memory_path).await {
-                Ok(content) if !content.trim().is_empty() => {
-                    if !output.is_empty() {
-                        output.push_str("\n\n");
-                    }
-                    if memory_file == "USER.md" {
-                        output.push_str("## User Profile\n\n");
-                    } else {
-                        output.push_str("## Agent Memory\n\n");
-                    }
-                    output.push_str(content.trim());
-                }
-                _ => {}
-            }
-        }
-
         if self.config.features.enabled(Feature::ChildAgentsMd) {
             if !output.is_empty() {
                 output.push_str("\n\n");
