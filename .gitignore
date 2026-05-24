@@ -1,38 +1,9 @@
-# Dependencies
-node_modules/
+bapX-src/
+.codex/
 __pycache__/
 *.pyc
-.venv/
-venv/
-
-# Build output
-app/dist/
-api/dist/
-agent/dist/
-
-# Data
-/data/
-*.db
-*.db-wal
-*.db-shm
-
-# Environment
 .env
-.env.local
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
+data/*.db
+research/
 .DS_Store
-Thumbs.db
 
-# Hermes system files
-.hermes/
-
-# Logs
-*.log
-logs/

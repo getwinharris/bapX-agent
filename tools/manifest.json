@@ -1,0 +1,180 @@
+{
+  "version": "1.0",
+  "description": "bapX built-in tools — installed in every sandbox",
+  "tools": {
+    "pptx": {
+      "name": "PowerPoint",
+      "desc": "Create, read, edit .pptx decks, slides, notes, templates",
+      "script": "tool_pptx.py",
+      "deps": ["python-pptx"]
+    },
+    "pdf": {
+      "name": "PDF Editor",
+      "desc": "Edit PDF text, merge, split, extract pages, OCR via natural language",
+      "script": "tool_pdf.py",
+      "deps": ["pymupdf", "marker-pdf"]
+    },
+    "ocr": {
+      "name": "OCR Engine",
+      "desc": "Extract text from images, PDFs, scans using tesseract + pymupdf",
+      "script": "tool_ocr.py",
+      "deps": ["pytesseract", "pymupdf", "tesseract-ocr"]
+    },
+    "youtube": {
+      "name": "YouTube",
+      "desc": "Get transcripts, summarize videos, search channels",
+      "script": "tool_youtube.py",
+      "deps": ["yt-dlp", "youtube-transcript-api"]
+    },
+    "notion": {
+      "name": "Notion",
+      "desc": "Create, read, update Notion pages, databases via API",
+      "script": "tool_notion.py",
+      "deps": []
+    },
+    "linear": {
+      "name": "Linear",
+      "desc": "Manage issues, projects, teams via Linear GraphQL API",
+      "script": "tool_linear.py",
+      "deps": []
+    },
+    "airtable": {
+      "name": "Airtable",
+      "desc": "CRUD records, filter, sort, upsert Airtable bases",
+      "script": "tool_airtable.py",
+      "deps": []
+    },
+    "email": {
+      "name": "Email",
+      "desc": "Send, receive, search email via IMAP/SMTP",
+      "script": "tool_email.py",
+      "deps": []
+    },
+    "gws": {
+      "name": "Google Workspace",
+      "desc": "Access Gmail, Calendar, Drive, Docs, Sheets",
+      "script": "tool_gws.py",
+      "deps": ["google-api-python-client", "google-auth-oauthlib"]
+    },
+    "maps": {
+      "name": "Maps",
+      "desc": "Geocode, search POIs, get routes, timezones via OpenStreetMap",
+      "script": "tool_maps.py",
+      "deps": []
+    },
+    "arxiv": {
+      "name": "arXiv",
+      "desc": "Search papers by keyword/author/category, get abstracts",
+      "script": "tool_arxiv.py",
+      "deps": ["arxiv"]
+    },
+    "rss": {
+      "name": "RSS Reader",
+      "desc": "Monitor blogs and RSS/Atom feeds, get updates",
+      "script": "tool_rss.py",
+      "deps": ["feedparser"]
+    },
+    "wiki": {
+      "name": "Wiki",
+      "desc": "Build and query interlinked markdown knowledge base",
+      "script": "tool_wiki.py",
+      "deps": []
+    },
+    "x": {
+      "name": "X/Twitter",
+      "desc": "Post tweets, search, DMs, get trends via API",
+      "script": "tool_x.py",
+      "deps": []
+    },
+    "spotify": {
+      "name": "Spotify",
+      "desc": "Play, search, queue tracks, manage playlists and devices",
+      "script": "tool_spotify.py",
+      "deps": ["spotipy"]
+    },
+    "gif": {
+      "name": "GIF Search",
+      "desc": "Search and download GIFs via Tenor API",
+      "script": "tool_gif.py",
+      "deps": []
+    },
+    "diagram": {
+      "name": "Diagrams",
+      "desc": "Generate Excalidraw JSON diagrams and SVG architecture diagrams",
+      "script": "tool_diagram.py",
+      "deps": []
+    },
+    "humantext": {
+      "name": "Humanizer",
+      "desc": "Strip AI-isms, add natural voice, vary sentence structure",
+      "script": "tool_humantext.py",
+      "deps": []
+    },
+    "notebook": {
+      "name": "Jupyter Notebook",
+      "desc": "Run interactive Python notebooks with live kernel",
+      "script": "tool_notebook.py",
+      "deps": ["jupyter", "nbformat"]
+    },
+    "ascii": {
+      "name": "ASCII Art",
+      "desc": "Generate ASCII art: banners, cowsay, image-to-ascii, boxes",
+      "script": "tool_ascii.py",
+      "deps": ["pyfiglet"]
+    },
+    "sketch": {
+      "name": "HTML Sketch",
+      "desc": "Build throwaway HTML/CSS mockups and design variants",
+      "script": "tool_sketch.py",
+      "deps": []
+    },
+    "p5": {
+      "name": "p5.js Sketch",
+      "desc": "Create p5.js generative art, shaders, interactive 3D scenes",
+      "script": "tool_p5.py",
+      "deps": []
+    },
+    "deploy-vercel": {
+      "name": "Vercel Deploy",
+      "desc": "Deploy projects to Vercel via API",
+      "script": "tool_deploy.py",
+      "deps": [],
+      "config": {"platform": "vercel"}
+    },
+    "deploy-github": {
+      "name": "GitHub Pages",
+      "desc": "Deploy sites to GitHub Pages",
+      "script": "tool_deploy.py",
+      "deps": [],
+      "config": {"platform": "github"}
+    },
+    "deploy-firebase": {
+      "name": "Firebase Hosting",
+      "desc": "Deploy to Firebase Hosting",
+      "script": "tool_deploy.py",
+      "deps": ["firebase-tools"],
+      "config": {"platform": "firebase"}
+    },
+    "deploy-railway": {
+      "name": "Railway",
+      "desc": "Deploy to Railway via API",
+      "script": "tool_deploy.py",
+      "deps": [],
+      "config": {"platform": "railway"}
+    },
+    "deploy-google-cloud": {
+      "name": "Google Cloud Run",
+      "desc": "Deploy to Google Cloud Run",
+      "script": "tool_deploy.py",
+      "deps": [],
+      "config": {"platform": "gcloud"}
+    },
+    "deploy-supabase": {
+      "name": "Supabase",
+      "desc": "Deploy to Supabase",
+      "script": "tool_deploy.py",
+      "deps": [],
+      "config": {"platform": "supabase"}
+    }
+  }
+}

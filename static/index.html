@@ -1,478 +1,478 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>bapX — Autonomous AI Agent Platform</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#0f0f13;--bg2:#14141c;--bg3:#1a1a24;--fg:#e8e8f0;--muted:#6b7280;--accent:#9651b8;--accent-hover:#7a3f9e;--accent-light:rgba(150,81,184,0.12);--border:rgba(255,255,255,0.06);--radius:8px;--radius-lg:12px;--radius-xl:16px;--shadow:0 2px 12px rgba(0,0,0,0.3)}
-    html{scroll-behavior:smooth;height:-webkit-fill-available}
-    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.6;min-height:100dvh}
-    a{color:var(--accent);text-decoration:none;transition:color .2s}
-    a:hover{color:#c084fc}
-
-    /* ── Nav ── */
-    nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;background:rgba(15,15,19,0.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:56px}
-    .nav-logo{font-size:1.375rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,#b35fd9,#7a3f9e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .nav-links{display:flex;align-items:center;gap:1.5rem}
-    .nav-links a{font-size:.875rem;font-weight:500;color:#9ca3af;transition:color .2s}
-    .nav-links a:hover{color:var(--fg)}
-    .nav-cta{padding:.5rem 1.25rem;background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff!important;border-radius:var(--radius);font-weight:600;font-size:.8125rem;transition:all .2s}
-    .nav-cta:hover{box-shadow:0 4px 16px rgba(150,81,184,0.3);transform:translateY(-1px)!important}
-    .mobile-menu-btn{display:none;background:none;border:none;color:var(--fg);cursor:pointer;padding:4px}
-    .mobile-menu{display:none}
-    @media(max-width:768px){
-      .nav-links{display:none}
-      .mobile-menu-btn{display:block}
-      .mobile-menu{position:fixed;top:56px;left:0;right:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem;display:none;flex-direction:column;gap:.75rem;z-index:99}
-      .mobile-menu.open{display:flex}
-      .mobile-menu a{font-size:.9375rem;padding:.5rem 0;color:#9ca3af}
-      .mobile-menu .nav-cta{text-align:center;padding:.75rem}
-    }
-
-    /* ── Hero ── */
-    .hero{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:7rem 1.5rem 4rem;text-align:center;position:relative;overflow:hidden}
-    .hero::before{content:'';position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:900px;height:900px;background:radial-gradient(circle,rgba(150,81,184,0.1) 0%,transparent 70%);pointer-events:none}
-    .hero-badge{display:inline-flex;align-items:center;gap:6px;padding:.375rem 1rem;border-radius:20px;background:var(--accent-light);border:1px solid rgba(150,81,184,0.2);font-size:.8125rem;font-weight:500;color:var(--accent);margin-bottom:2rem;animation:badgeIn 1s ease both}
-    @keyframes badgeIn{0%{opacity:0;transform:translateY(-10px)}100%{opacity:1;transform:translateY(0)}}
-    .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s ease-in-out infinite;display:inline-block}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-    .hero h1{font-size:clamp(2.25rem,5vw,4rem);font-weight:800;letter-spacing:-0.04em;line-height:1.05;margin-bottom:1.5rem;animation:fadeUp .8s ease .2s both}
-    .hero h1 .gradient{background:linear-gradient(135deg,#b35fd9,#7a3f9e,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .hero p{font-size:clamp(1rem,1.5vw,1.25rem);color:var(--muted);max-width:600px;margin:0 auto 2.5rem;line-height:1.7;animation:fadeUp .8s ease .35s both}
-    @keyframes fadeUp{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
-    .hero-cta{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;animation:fadeUp .8s ease .5s both}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:.8125rem 2rem;border-radius:var(--radius);font-size:.9375rem;font-weight:600;cursor:pointer;transition:all .3s cubic-bezier(.22,1,.36,1);font-family:inherit;border:none;line-height:1}
-    .btn:hover{transform:translateY(-2px)}
-    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff}
-    .btn-primary:hover{box-shadow:0 8px 28px rgba(150,81,184,0.4)}
-    .btn-secondary{background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--fg)}
-    .btn-secondary:hover{background:rgba(255,255,255,0.08);border-color:rgba(150,81,184,0.3)}
-    .btn-lg{padding:1rem 2.5rem;font-size:1.0625rem}
-    @media(max-width:768px){.hero-cta{flex-direction:column;align-items:stretch}}
-
-    /* ── Hero Stats ── */
-    .hero-stats{display:flex;justify-content:center;gap:3rem;margin-top:3rem;padding-top:2.5rem;border-top:1px solid var(--border);animation:fadeUp .8s ease .65s both}
-    .stat{text-align:center}
-    .stat-num{font-size:1.75rem;font-weight:800;color:var(--fg)}
-    .stat-label{font-size:.8125rem;color:var(--muted);margin-top:.25rem}
-    @media(max-width:768px){.hero-stats{gap:1.5rem;flex-wrap:wrap}.stat-num{font-size:1.375rem}}
-
-    /* ── Screenshot Showcase ── */
-    .showcase{position:relative;width:100%;max-width:900px;margin:3rem auto 0;perspective:1200px;animation:fadeUp 1s ease .8s both}
-    .showcase-inner{position:relative;width:100%;padding-top:62%;border-radius:var(--radius-xl);overflow:hidden;border:1px solid var(--border);background:var(--bg3);box-shadow:0 20px 60px rgba(0,0,0,0.5)}
-    .showcase-img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transition:opacity .8s ease}
-    .showcase-img.fade{opacity:0}
-    .showcase-overlay{position:absolute;bottom:0;left:0;right:0;padding:1.5rem;background:linear-gradient(transparent,rgba(0,0,0,0.7));text-align:left}
-    .showcase-overlay div{font-size:.8125rem;color:rgba(255,255,255,0.6)}
-    .showcase-overlay strong{color:#fff;font-weight:600}
-    .showcase-dots{display:flex;gap:8px;justify-content:center;margin-top:1rem}
-    .showcase-dot{width:8px;height:8px;border-radius:50%;background:var(--border);cursor:pointer;transition:all .3s}
-    .showcase-dot.active{background:var(--accent);width:24px;border-radius:4px}
-
-    /* ── Sections ── */
-    section{padding:6rem 1.5rem;max-width:1100px;margin:0 auto}
-    .section-label{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
-    .section-title{font-size:clamp(1.75rem,3vw,2.5rem);font-weight:800;letter-spacing:-0.03em;line-height:1.15;margin-bottom:1rem}
-    .section-subtitle{font-size:clamp(.9375rem,1.2vw,1.125rem);color:var(--muted);max-width:600px;line-height:1.6}
-    .center{text-align:center}
-    .center .section-subtitle{margin:0 auto 2rem}
-    .divider{height:1px;background:var(--border);margin:0 auto;max-width:1100px}
-
-    /* ── Animated Steps ── */
-    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:2rem}
-    .step{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;position:relative;transition:all .5s cubic-bezier(.22,1,.36,1);opacity:0;transform:translateY(30px)}
-    .step.visible{opacity:1;transform:translateY(0)}
-    .step:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,0.25)}
-    .step-num{position:absolute;top:1rem;right:1rem;font-size:2.5rem;font-weight:800;color:rgba(150,81,184,0.12);line-height:1}
-    .step-icon{width:44px;height:44px;border-radius:12px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;color:var(--accent)}
-    .step h3{font-size:1.125rem;font-weight:700;margin-bottom:.5rem}
-    .step p{font-size:.875rem;color:var(--muted);line-height:1.6}
-    @media(max-width:768px){.steps{grid-template-columns:1fr}}
-
-    /* ── Cards Grid ── */
-    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:2rem}
-    .card{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;transition:all .4s cubic-bezier(.22,1,.36,1);opacity:0;transform:translateY(20px)}
-    .card.visible{opacity:1;transform:translateY(0)}
-    .card:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,0.2)}
-    .card-icon{width:40px;height:40px;border-radius:10px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;margin-bottom:1rem;color:var(--accent);font-size:1.125rem}
-    .card h3{font-size:1rem;font-weight:700;margin-bottom:.375rem}
-    .card p{font-size:.8125rem;color:var(--muted);line-height:1.6}
-    @media(max-width:768px){.cards{grid-template-columns:1fr}}
-
-    /* ── Provider Grid ── */
-    .provider-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;margin-top:2rem}
-    .provider-item{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center;font-size:.8125rem;font-weight:500;color:var(--muted);transition:all .3s}
-    .provider-item:hover{border-color:rgba(150,81,184,0.25);color:var(--fg);transform:translateY(-2px)}
-
-    /* ── Skills ── */
-    .skill-tags{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;margin-top:2rem;max-width:800px;margin-left:auto;margin-right:auto}
-    .skill-tag{padding:.375rem .875rem;border-radius:20px;background:var(--accent-light);border:1px solid rgba(150,81,184,0.12);font-size:.8125rem;font-weight:500;color:var(--accent);transition:all .2s}
-    .skill-tag:hover{background:rgba(150,81,184,0.2);transform:translateY(-1px)}
-    .skill-categories{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;margin-top:2rem;text-align:left}
-    .skill-cat{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;transition:all .2s}
-    .skill-cat:hover{border-color:rgba(150,81,184,0.2)}
-    .skill-cat h4{font-size:.875rem;font-weight:600;margin-bottom:.25rem;display:flex;align-items:center}
-    .skill-cat p{font-size:.75rem;color:var(--muted)}
-
-    /* ── CTA ── */
-    .cta-section{text-align:center;padding:6rem 1.5rem;position:relative}
-    .cta-section::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(150,81,184,0.06) 0%,transparent 70%);pointer-events:none}
-    .cta-card{background:linear-gradient(135deg,rgba(150,81,184,0.06),rgba(99,102,241,0.04));border:1px solid rgba(150,81,184,0.15);border-radius:var(--radius-xl);padding:3.5rem 2rem;max-width:700px;margin:0 auto;position:relative}
-    .cta-card h2{font-size:2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:.75rem}
-    .cta-card p{color:var(--muted);margin-bottom:2rem;font-size:1rem}
-    .cta-footer-text{margin-top:1rem;font-size:.8125rem;color:var(--muted)}
-
-    /* ── Footer ── */
-    footer{padding:2rem 1.5rem 3rem;border-top:1px solid var(--border);text-align:center}
-    footer p{font-size:.8125rem;color:var(--muted)}
-    footer .footer-links{display:flex;justify-content:center;gap:2rem;margin-bottom:1rem;flex-wrap:wrap}
-    footer .footer-links a{font-size:.8125rem;color:var(--muted)}
-    footer .footer-links a:hover{color:var(--fg)}
-
-    @media(max-width:768px){
-      section{padding:3rem 1rem}
-      .section-title{font-size:1.5rem}
-      .provider-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
-      .skill-categories{grid-template-columns:1fr 1fr}
-      .cta-card{padding:2.5rem 1.5rem}
-      .cta-card h2{font-size:1.5rem}
-    }
-    @media(max-width:480px){
-      .skill-categories{grid-template-columns:1fr}
-      .hero-cta{flex-direction:column;align-items:stretch}
-    }
-  </style>
-</head>
-<body>
-
-<!-- Nav -->
-<nav>
-  <div class="nav-logo">bapX</div>
-  <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#how-it-works">How It Works</a>
-    <a href="#providers">Providers</a>
-    <a href="/pricing.html">Pricing</a>
-    <a href="/about.html">About</a>
-    <a href="/docs.html">Docs</a>
-    <a href="/dashboard.html#login">Sign In</a>
-    <a href="/dashboard.html#signup" class="nav-cta">Get Started</a>
-  </div>
-  <button class="mobile-menu-btn" onclick="toggleMobile()" aria-label="Menu">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-  </button>
-</nav>
-<div class="mobile-menu" id="mobile-menu">
-  <a href="#features" onclick="toggleMobile()">Features</a>
-  <a href="#how-it-works" onclick="toggleMobile()">How It Works</a>
-  <a href="#providers" onclick="toggleMobile()">Providers</a>
-  <a href="/pricing.html" onclick="toggleMobile()">Pricing</a>
-  <a href="/about.html" onclick="toggleMobile()">About</a>
-  <a href="/docs.html" onclick="toggleMobile()">Docs</a>
-  <a href="/dashboard.html#login" onclick="toggleMobile()">Sign In</a>
-  <a href="/dashboard.html#signup" class="nav-cta" onclick="toggleMobile()">Get Started</a>
-</div>
-
-<!-- Hero -->
-<section class="hero" id="hero">
-  <div class="hero-badge"><span class="dot"></span> Now in Beta — Free to Start</div>
-  <h1>Your own AI agent,<br>powered by <span class="gradient">any model</span></h1>
-  <p>Connect ChatGPT, Claude, API keys, or any of 26+ providers. Get a fully autonomous agent with sandboxed execution, persistent memory, and 100+ built-in skills — all in your browser.</p>
-  <div class="hero-cta">
-    <a href="/dashboard.html#signup" class="btn btn-primary btn-lg">Start Free</a>
-    <a href="#how-it-works" class="btn btn-secondary btn-lg">How It Works</a>
-  </div>
-
-  <!-- Animated Screenshot Showcase -->
-  <div class="showcase">
-    <div class="showcase-inner">
-      <img src="screenshots/hero-fullpage.png" alt="bapX Dashboard" class="showcase-img" id="showcase-img" loading="lazy">
-      <div class="showcase-overlay">
-        <div><strong>bapX Agent</strong> &mdash; Chat, Skills, Settings &amp; Sandbox</div>
-      </div>
-    </div>
-    <div class="showcase-dots">
-      <span class="showcase-dot active" data-idx="0"></span>
-      <span class="showcase-dot" data-idx="1"></span>
-      <span class="showcase-dot" data-idx="2"></span>
-    </div>
-  </div>
-
-  <div class="hero-stats">
-    <div class="stat"><div class="stat-num">26+</div><div class="stat-label">AI Providers</div></div>
-    <div class="stat"><div class="stat-num">100+</div><div class="stat-label">Built-in Skills</div></div>
-    <div class="stat"><div class="stat-num">5</div><div class="stat-label">Auth Methods</div></div>
-    <div class="stat"><div class="stat-num">Free</div><div class="stat-label">AI Compute</div></div>
-  </div>
-</section>
-
-<div class="divider"></div>
-
-<!-- How It Works -->
-<section id="how-it-works" class="center">
-  <div class="section-label">How It Works</div>
-  <h2 class="section-title">One platform, your choice of AI</h2>
-  <p class="section-subtitle">Bring your own API key or connect via OAuth. bapX handles everything else.</p>
-  <div class="steps">
-    <div class="step" data-delay="0">
-      <div class="step-num">01</div>
-      <div class="step-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      </div>
-      <h3>Create Your Account</h3>
-      <p>Sign up in seconds with email or Google. No credit card required — you use your own AI provider.</p>
-    </div>
-    <div class="step" data-delay="150">
-      <div class="step-num">02</div>
-      <div class="step-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-      </div>
-      <h3>Connect Your Provider</h3>
-      <p>API key, ChatGPT OAuth, Claude OAuth, Google OAuth, or Copilot — choose your auth method.</p>
-    </div>
-    <div class="step" data-delay="300">
-      <div class="step-num">03</div>
-      <div class="step-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      </div>
-      <h3>Get Things Done</h3>
-      <p>Your agent works autonomously — code, research, create, browse, and execute. 100+ skills ready to go.</p>
-    </div>
-  </div>
-</section>
-
-<div class="divider"></div>
-
-<!-- Features -->
-<section id="features" class="center">
-  <div class="section-label">Features</div>
-  <h2 class="section-title">Everything you need in one place</h2>
-  <p class="section-subtitle">Not just a chat interface — a full autonomous agent workspace.</p>
-  <div class="cards">
-    <div class="card" data-delay="0">
-      <div class="card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      </div>
-      <h3>Multi-Model Chat</h3>
-      <p>Seamlessly switch between any AI provider. One interface for GPT-4o, Claude, Gemini, Grok, DeepSeek, and more.</p>
-    </div>
-    <div class="card" data-delay="100">
-      <div class="card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      </div>
-      <h3>100+ Built-in Skills</h3>
-      <p>From web research and coding to design and data science. Skills are user-created and ready to toggle on/off.</p>
-    </div>
-    <div class="card" data-delay="200">
-      <div class="card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-      </div>
-      <h3>Sandboxed Execution</h3>
-      <p>Your agent runs code in isolated Docker containers. Safe, secure, and automatically cleaned up.</p>
-    </div>
-    <div class="card" data-delay="300">
-      <div class="card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      </div>
-      <h3>OAuth Login</h3>
-      <p>Connect ChatGPT Plus, Claude Max, Grok, and more via device-code OAuth. No API key needed for supported providers.</p>
-    </div>
-    <div class="card" data-delay="400">
-      <div class="card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      </div>
-      <h3>Memory &amp; Context</h3>
-      <p>Persistent memory across sessions. Your agent remembers preferences, learns from corrections, and gets smarter over time.</p>
-    </div>
-    <div class="card" data-delay="500">
-      <div class="card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-      </div>
-      <h3>Canvas &amp; Preview</h3>
-      <p>Visual workspace for diagrams, websites, and presentations. Built-in browser preview and live editing.</p>
-    </div>
-  </div>
-</section>
-
-<div class="divider"></div>
-
-<!-- Providers -->
-<section id="providers" class="center">
-  <div class="section-label">Providers</div>
-  <h2 class="section-title">26+ AI providers, one platform</h2>
-  <p class="section-subtitle">API key or OAuth — whichever you prefer. Bring your own key and keep full control.</p>
-  <div class="provider-grid">
-    <div class="provider-item">OpenAI</div>
-    <div class="provider-item">Anthropic</div>
-    <div class="provider-item">Google Gemini</div>
-    <div class="provider-item">DeepSeek</div>
-    <div class="provider-item">OpenRouter</div>
-    <div class="provider-item">xAI Grok</div>
-    <div class="provider-item">Groq</div>
-    <div class="provider-item">Mistral</div>
-    <div class="provider-item">Together AI</div>
-    <div class="provider-item">Cohere</div>
-    <div class="provider-item">Perplexity</div>
-    <div class="provider-item">Hugging Face</div>
-    <div class="provider-item">MiniMax</div>
-    <div class="provider-item">Kimi Moonshot</div>
-    <div class="provider-item">Xiaomi MiMo</div>
-    <div class="provider-item">Z.AI GLM</div>
-    <div class="provider-item">Alibaba DashScope</div>
-    <div class="provider-item">StepFun</div>
-    <div class="provider-item">GitHub Copilot</div>
-    <div class="provider-item">Qwen Portal</div>
-    <div class="provider-item">ChatGPT (OAuth)</div>
-    <div class="provider-item">Nous Portal</div>
-  </div>
-  <p style="margin-top:1.5rem;font-size:.875rem;color:var(--muted)">...and more. API key + OAuth + Copilot auth methods supported.</p>
-</section>
-
-<div class="divider"></div>
-
-<!-- Skills -->
-<section class="center">
-  <div class="section-label">Skills</div>
-  <h2 class="section-title">100+ skills at your agent's fingertips</h2>
-  <p class="section-subtitle">Skills you create in your sandbox. Toggle them on/off as needed.</p>
-  <div class="skill-categories">
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Autonomous Agents</h4><p>Codex, Claude Code, OpenCode agents</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Creative</h4><p>ASCII art, design, infographics, pixel art, sketches</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Content</h4><p>Blog writing, YouTube summaries, presentations</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> Development</h4><p>TDD, code review, debugging, project planning</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> Data Science</h4><p>Jupyter notebooks, evaluation, DSPy, W&B</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security</h4><p>Red teaming, code audit, vulnerability scanning</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Web</h4><p>Browser automation, web scraping, API testing</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Social</h4><p>X/Twitter, email, GIF search, Spotify, YouTube</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg> DevOps</h4><p>GitHub workflows, Kanban, cron jobs, deployment</p></div>
-    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Research</h4><p>ArXiv, blog monitoring, knowledge graphs, PMC</p></div>
-  </div>
-  <div class="skill-tags">
-    <span class="skill-tag">code-review</span>
-    <span class="skill-tag">design-md</span>
-    <span class="skill-tag">excalidraw</span>
-    <span class="skill-tag">manim-video</span>
-    <span class="skill-tag">p5js</span>
-    <span class="skill-tag">pixel-art</span>
-    <span class="skill-tag">spotify</span>
-    <span class="skill-tag">arxiv</span>
-    <span class="skill-tag">llama-cpp</span>
-    <span class="skill-tag">dspy</span>
-    <span class="skill-tag">notion</span>
-    <span class="skill-tag">obsidian</span>
-    <span class="skill-tag">airtable</span>
-    <span class="skill-tag">linear</span>
-    <span class="skill-tag">godmode</span>
-    <span class="skill-tag">minecraft</span>
-    <span class="skill-tag">pokemon</span>
-    <span class="skill-tag">opensandbox</span>
-  </div>
-</section>
-
-<div class="divider"></div>
-
-<!-- CTA -->
-<section class="cta-section">
-  <div class="cta-card">
-    <h2>Ready to build with your AI?</h2>
-    <p>Connect your provider and start using your AI agent in minutes. No credit card, no commitment.</p>
-    <a href="/dashboard.html#signup" class="btn btn-primary btn-lg">Create Your Agent</a>
-    <div class="cta-footer-text">Free to start. Only pay for storage used.</div>
-  </div>
-</section>
-
-<!-- Footer -->
-<footer>
-  <div class="footer-links">
-    <a href="#hero">Home</a>
-    <a href="#features">Features</a>
-    <a href="#how-it-works">How It Works</a>
-    <a href="#providers">Providers</a>
-    <a href="/pricing.html">Pricing</a>
-    <a href="/about.html">About</a>
-    <a href="/docs.html">Docs</a>
-    <a href="/dashboard.html#login">Sign In</a>
-  </div>
-  <p>&copy; 2026 bapX. All rights reserved.</p>
-</footer>
-
-<script>
-function toggleMobile(){
-  var menu = document.getElementById('mobile-menu');
-  menu.classList.toggle('open');
-}
-document.addEventListener('click', function(e){
-  if(!e.target.closest('.mobile-menu') && !e.target.closest('.mobile-menu-btn')){
-    document.getElementById('mobile-menu').classList.remove('open');
-  }
-});
-
-// Smooth scroll for hash links
-document.querySelectorAll('a[href^="#"]').forEach(function(a){
-  a.addEventListener('click', function(e){
-    var target = document.querySelector(this.getAttribute('href'));
-    if(target){
-      e.preventDefault();
-      target.scrollIntoView({behavior:'smooth'});
-    }
-  });
-});
-
-// Intersection Observer for scroll animations
-var observer = new IntersectionObserver(function(entries){
-  entries.forEach(function(entry){
-    if(entry.isIntersecting){
-      entry.target.style.transitionDelay = (parseInt(entry.target.dataset.delay)||0) + 'ms';
-      entry.target.classList.add('visible');
-      observer.unobserve(entry.target);
-    }
-  });
-}, {threshold:0.15});
-
-document.querySelectorAll('.step, .card').forEach(function(el){
-  observer.observe(el);
-});
-
-// Screenshot carousel
-var showcaseImages = [
-  'screenshots/hero-fullpage.png',
-  'screenshots/signup-form.png',
-  'screenshots/hero-fullpage.png'
-];
-var showcaseCaptions = [
-  '<strong>bapX Dashboard</strong> &mdash; Chat, Skills, Settings &amp; Sandbox',
-  '<strong>Sign Up</strong> &mdash; Create your account in seconds',
-  '<strong>Multi-Provider Chat</strong> &mdash; Switch between any AI model'
-];
-var currentIdx = 0;
-
-function showScreenshot(idx){
-  var img = document.getElementById('showcase-img');
-  img.classList.add('fade');
-  setTimeout(function(){
-    img.src = showcaseImages[idx];
-    document.querySelector('.showcase-overlay div').innerHTML = showcaseCaptions[idx];
-    img.classList.remove('fade');
-  }, 400);
-  document.querySelectorAll('.showcase-dot').forEach(function(dot, i){
-    dot.classList.toggle('active', i === idx);
-  });
-  currentIdx = idx;
-}
-
-document.querySelectorAll('.showcase-dot').forEach(function(dot){
-  dot.addEventListener('click', function(){
-    showScreenshot(parseInt(this.dataset.idx));
-  });
-});
-
-// Auto-rotate screenshots every 5 seconds
-setInterval(function(){
-  showScreenshot((currentIdx + 1) % showcaseImages.length);
-}, 5000);
-</script>
-</body>
-</html>
+     1|<!DOCTYPE html>
+     2|<html lang="en">
+     3|<head>
+     4|  <meta charset="UTF-8">
+     5|  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+     6|  <title>bapX — Autonomous AI Agent Platform</title>
+     7|  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+     8|  <style>
+     9|    *{box-sizing:border-box;margin:0;padding:0}
+    10|    :root{--bg:#0f0f13;--bg2:#14141c;--bg3:#1a1a24;--fg:#e8e8f0;--muted:#6b7280;--accent:#9651b8;--accent-hover:#7a3f9e;--accent-light:rgba(150,81,184,0.12);--border:rgba(255,255,255,0.06);--radius:8px;--radius-lg:12px;--radius-xl:16px;--shadow:0 2px 12px rgba(0,0,0,0.3)}
+    11|    html{scroll-behavior:smooth;height:-webkit-fill-available}
+    12|    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.6;min-height:100dvh}
+    13|    a{color:var(--accent);text-decoration:none;transition:color .2s}
+    14|    a:hover{color:#c084fc}
+    15|
+    16|    /* ── Nav ── */
+    17|    nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;background:rgba(15,15,19,0.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:56px}
+    18|    .nav-logo{font-size:1.375rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,#b35fd9,#7a3f9e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    19|    .nav-links{display:flex;align-items:center;gap:1.5rem}
+    20|    .nav-links a{font-size:.875rem;font-weight:500;color:#9ca3af;transition:color .2s}
+    21|    .nav-links a:hover{color:var(--fg)}
+    22|    .nav-cta{padding:.5rem 1.25rem;background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff!important;border-radius:var(--radius);font-weight:600;font-size:.8125rem;transition:all .2s}
+    23|    .nav-cta:hover{box-shadow:0 4px 16px rgba(150,81,184,0.3);transform:translateY(-1px)!important}
+    24|    .mobile-menu-btn{display:none;background:none;border:none;color:var(--fg);cursor:pointer;padding:4px}
+    25|    .mobile-menu{display:none}
+    26|    @media(max-width:768px){
+    27|      .nav-links{display:none}
+    28|      .mobile-menu-btn{display:block}
+    29|      .mobile-menu{position:fixed;top:56px;left:0;right:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem;display:none;flex-direction:column;gap:.75rem;z-index:99}
+    30|      .mobile-menu.open{display:flex}
+    31|      .mobile-menu a{font-size:.9375rem;padding:.5rem 0;color:#9ca3af}
+    32|      .mobile-menu .nav-cta{text-align:center;padding:.75rem}
+    33|    }
+    34|
+    35|    /* ── Hero ── */
+    36|    .hero{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:7rem 1.5rem 4rem;text-align:center;position:relative;overflow:hidden}
+    37|    .hero::before{content:'';position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:900px;height:900px;background:radial-gradient(circle,rgba(150,81,184,0.1) 0%,transparent 70%);pointer-events:none}
+    38|    .hero-badge{display:inline-flex;align-items:center;gap:6px;padding:.375rem 1rem;border-radius:20px;background:var(--accent-light);border:1px solid rgba(150,81,184,0.2);font-size:.8125rem;font-weight:500;color:var(--accent);margin-bottom:2rem;animation:badgeIn 1s ease both}
+    39|    @keyframes badgeIn{0%{opacity:0;transform:translateY(-10px)}100%{opacity:1;transform:translateY(0)}}
+    40|    .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s ease-in-out infinite;display:inline-block}
+    41|    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    42|    .hero h1{font-size:clamp(2.25rem,5vw,4rem);font-weight:800;letter-spacing:-0.04em;line-height:1.05;margin-bottom:1.5rem;animation:fadeUp .8s ease .2s both}
+    43|    .hero h1 .gradient{background:linear-gradient(135deg,#b35fd9,#7a3f9e,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    44|    .hero p{font-size:clamp(1rem,1.5vw,1.25rem);color:var(--muted);max-width:600px;margin:0 auto 2.5rem;line-height:1.7;animation:fadeUp .8s ease .35s both}
+    45|    @keyframes fadeUp{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
+    46|    .hero-cta{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;animation:fadeUp .8s ease .5s both}
+    47|    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:.8125rem 2rem;border-radius:var(--radius);font-size:.9375rem;font-weight:600;cursor:pointer;transition:all .3s cubic-bezier(.22,1,.36,1);font-family:inherit;border:none;line-height:1}
+    48|    .btn:hover{transform:translateY(-2px)}
+    49|    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff}
+    50|    .btn-primary:hover{box-shadow:0 8px 28px rgba(150,81,184,0.4)}
+    51|    .btn-secondary{background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--fg)}
+    52|    .btn-secondary:hover{background:rgba(255,255,255,0.08);border-color:rgba(150,81,184,0.3)}
+    53|    .btn-lg{padding:1rem 2.5rem;font-size:1.0625rem}
+    54|    @media(max-width:768px){.hero-cta{flex-direction:column;align-items:stretch}}
+    55|
+    56|    /* ── Hero Stats ── */
+    57|    .hero-stats{display:flex;justify-content:center;gap:3rem;margin-top:3rem;padding-top:2.5rem;border-top:1px solid var(--border);animation:fadeUp .8s ease .65s both}
+    58|    .stat{text-align:center}
+    59|    .stat-num{font-size:1.75rem;font-weight:800;color:var(--fg)}
+    60|    .stat-label{font-size:.8125rem;color:var(--muted);margin-top:.25rem}
+    61|    @media(max-width:768px){.hero-stats{gap:1.5rem;flex-wrap:wrap}.stat-num{font-size:1.375rem}}
+    62|
+    63|    /* ── Screenshot Showcase ── */
+    64|    .showcase{position:relative;width:100%;max-width:900px;margin:3rem auto 0;perspective:1200px;animation:fadeUp 1s ease .8s both}
+    65|    .showcase-inner{position:relative;width:100%;padding-top:62%;border-radius:var(--radius-xl);overflow:hidden;border:1px solid var(--border);background:var(--bg3);box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+    66|    .showcase-img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transition:opacity .8s ease}
+    67|    .showcase-img.fade{opacity:0}
+    68|    .showcase-overlay{position:absolute;bottom:0;left:0;right:0;padding:1.5rem;background:linear-gradient(transparent,rgba(0,0,0,0.7));text-align:left}
+    69|    .showcase-overlay div{font-size:.8125rem;color:rgba(255,255,255,0.6)}
+    70|    .showcase-overlay strong{color:#fff;font-weight:600}
+    71|    .showcase-dots{display:flex;gap:8px;justify-content:center;margin-top:1rem}
+    72|    .showcase-dot{width:8px;height:8px;border-radius:50%;background:var(--border);cursor:pointer;transition:all .3s}
+    73|    .showcase-dot.active{background:var(--accent);width:24px;border-radius:4px}
+    74|
+    75|    /* ── Sections ── */
+    76|    section{padding:6rem 1.5rem;max-width:1100px;margin:0 auto}
+    77|    .section-label{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+    78|    .section-title{font-size:clamp(1.75rem,3vw,2.5rem);font-weight:800;letter-spacing:-0.03em;line-height:1.15;margin-bottom:1rem}
+    79|    .section-subtitle{font-size:clamp(.9375rem,1.2vw,1.125rem);color:var(--muted);max-width:600px;line-height:1.6}
+    80|    .center{text-align:center}
+    81|    .center .section-subtitle{margin:0 auto 2rem}
+    82|    .divider{height:1px;background:var(--border);margin:0 auto;max-width:1100px}
+    83|
+    84|    /* ── Animated Steps ── */
+    85|    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:2rem}
+    86|    .step{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;position:relative;transition:all .5s cubic-bezier(.22,1,.36,1);opacity:0;transform:translateY(30px)}
+    87|    .step.visible{opacity:1;transform:translateY(0)}
+    88|    .step:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,0.25)}
+    89|    .step-num{position:absolute;top:1rem;right:1rem;font-size:2.5rem;font-weight:800;color:rgba(150,81,184,0.12);line-height:1}
+    90|    .step-icon{width:44px;height:44px;border-radius:12px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;color:var(--accent)}
+    91|    .step h3{font-size:1.125rem;font-weight:700;margin-bottom:.5rem}
+    92|    .step p{font-size:.875rem;color:var(--muted);line-height:1.6}
+    93|    @media(max-width:768px){.steps{grid-template-columns:1fr}}
+    94|
+    95|    /* ── Cards Grid ── */
+    96|    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:2rem}
+    97|    .card{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;transition:all .4s cubic-bezier(.22,1,.36,1);opacity:0;transform:translateY(20px)}
+    98|    .card.visible{opacity:1;transform:translateY(0)}
+    99|    .card:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,0.2)}
+   100|    .card-icon{width:40px;height:40px;border-radius:10px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;margin-bottom:1rem;color:var(--accent);font-size:1.125rem}
+   101|    .card h3{font-size:1rem;font-weight:700;margin-bottom:.375rem}
+   102|    .card p{font-size:.8125rem;color:var(--muted);line-height:1.6}
+   103|    @media(max-width:768px){.cards{grid-template-columns:1fr}}
+   104|
+   105|    /* ── Provider Grid ── */
+   106|    .provider-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;margin-top:2rem}
+   107|    .provider-item{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center;font-size:.8125rem;font-weight:500;color:var(--muted);transition:all .3s}
+   108|    .provider-item:hover{border-color:rgba(150,81,184,0.25);color:var(--fg);transform:translateY(-2px)}
+   109|
+   110|    /* ── Skills ── */
+   111|    .skill-tags{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;margin-top:2rem;max-width:800px;margin-left:auto;margin-right:auto}
+   112|    .skill-tag{padding:.375rem .875rem;border-radius:20px;background:var(--accent-light);border:1px solid rgba(150,81,184,0.12);font-size:.8125rem;font-weight:500;color:var(--accent);transition:all .2s}
+   113|    .skill-tag:hover{background:rgba(150,81,184,0.2);transform:translateY(-1px)}
+   114|    .skill-categories{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;margin-top:2rem;text-align:left}
+   115|    .skill-cat{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;transition:all .2s}
+   116|    .skill-cat:hover{border-color:rgba(150,81,184,0.2)}
+   117|    .skill-cat h4{font-size:.875rem;font-weight:600;margin-bottom:.25rem;display:flex;align-items:center}
+   118|    .skill-cat p{font-size:.75rem;color:var(--muted)}
+   119|
+   120|    /* ── CTA ── */
+   121|    .cta-section{text-align:center;padding:6rem 1.5rem;position:relative}
+   122|    .cta-section::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(150,81,184,0.06) 0%,transparent 70%);pointer-events:none}
+   123|    .cta-card{background:linear-gradient(135deg,rgba(150,81,184,0.06),rgba(99,102,241,0.04));border:1px solid rgba(150,81,184,0.15);border-radius:var(--radius-xl);padding:3.5rem 2rem;max-width:700px;margin:0 auto;position:relative}
+   124|    .cta-card h2{font-size:2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:.75rem}
+   125|    .cta-card p{color:var(--muted);margin-bottom:2rem;font-size:1rem}
+   126|    .cta-footer-text{margin-top:1rem;font-size:.8125rem;color:var(--muted)}
+   127|
+   128|    /* ── Footer ── */
+   129|    footer{padding:2rem 1.5rem 3rem;border-top:1px solid var(--border);text-align:center}
+   130|    footer p{font-size:.8125rem;color:var(--muted)}
+   131|    footer .footer-links{display:flex;justify-content:center;gap:2rem;margin-bottom:1rem;flex-wrap:wrap}
+   132|    footer .footer-links a{font-size:.8125rem;color:var(--muted)}
+   133|    footer .footer-links a:hover{color:var(--fg)}
+   134|
+   135|    @media(max-width:768px){
+   136|      section{padding:3rem 1rem}
+   137|      .section-title{font-size:1.5rem}
+   138|      .provider-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+   139|      .skill-categories{grid-template-columns:1fr 1fr}
+   140|      .cta-card{padding:2.5rem 1.5rem}
+   141|      .cta-card h2{font-size:1.5rem}
+   142|    }
+   143|    @media(max-width:480px){
+   144|      .skill-categories{grid-template-columns:1fr}
+   145|      .hero-cta{flex-direction:column;align-items:stretch}
+   146|    }
+   147|  </style>
+   148|</head>
+   149|<body>
+   150|
+   151|<!-- Nav -->
+   152|<nav>
+   153|  <div class="nav-logo">bapX</div>
+   154|  <div class="nav-links">
+   155|    <a href="#features">Features</a>
+   156|    <a href="#how-it-works">How It Works</a>
+   157|    <a href="#providers">Providers</a>
+   158|    <a href="/pricing.html">Pricing</a>
+   159|    <a href="/about.html">About</a>
+   160|    <a href="/docs.html">Docs</a>
+   161|    <a href="/dashboard.html#login">Sign In</a>
+   162|    <a href="/dashboard.html#signup" class="nav-cta">Get Started</a>
+   163|  </div>
+   164|  <button class="mobile-menu-btn" onclick="toggleMobile()" aria-label="Menu">
+   165|    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+   166|  </button>
+   167|</nav>
+   168|<div class="mobile-menu" id="mobile-menu">
+   169|  <a href="#features" onclick="toggleMobile()">Features</a>
+   170|  <a href="#how-it-works" onclick="toggleMobile()">How It Works</a>
+   171|  <a href="#providers" onclick="toggleMobile()">Providers</a>
+   172|  <a href="/pricing.html" onclick="toggleMobile()">Pricing</a>
+   173|  <a href="/about.html" onclick="toggleMobile()">About</a>
+   174|  <a href="/docs.html" onclick="toggleMobile()">Docs</a>
+   175|  <a href="/dashboard.html#login" onclick="toggleMobile()">Sign In</a>
+   176|  <a href="/dashboard.html#signup" class="nav-cta" onclick="toggleMobile()">Get Started</a>
+   177|</div>
+   178|
+   179|<!-- Hero -->
+   180|<section class="hero" id="hero">
+   181|  <div class="hero-badge"><span class="dot"></span> Now in Beta — Free to Start</div>
+   182|  <h1>Your own AI agent,<br>powered by <span class="gradient">any model</span></h1>
+   183|  <p>Connect ChatGPT, Claude, API keys, or any of 26+ providers. Get a fully autonomous agent with sandboxed execution, persistent memory, and 100+ built-in skills — all in your browser.</p>
+   184|  <div class="hero-cta">
+   185|    <a href="/dashboard.html#signup" class="btn btn-primary btn-lg">Start Free</a>
+   186|    <a href="#how-it-works" class="btn btn-secondary btn-lg">How It Works</a>
+   187|  </div>
+   188|
+   189|  <!-- Animated Screenshot Showcase -->
+   190|  <div class="showcase">
+   191|    <div class="showcase-inner">
+   192|      <img src="screenshots/hero-fullpage.png" alt="bapX Dashboard" class="showcase-img" id="showcase-img" loading="lazy">
+   193|      <div class="showcase-overlay">
+   194|        <div><strong>bapX Agent</strong> &mdash; Chat, Skills, Settings &amp; Sandbox</div>
+   195|      </div>
+   196|    </div>
+   197|    <div class="showcase-dots">
+   198|      <span class="showcase-dot active" data-idx="0"></span>
+   199|      <span class="showcase-dot" data-idx="1"></span>
+   200|      <span class="showcase-dot" data-idx="2"></span>
+   201|    </div>
+   202|  </div>
+   203|
+   204|  <div class="hero-stats">
+   205|    <div class="stat"><div class="stat-num">26+</div><div class="stat-label">AI Providers</div></div>
+   206|    <div class="stat"><div class="stat-num">100+</div><div class="stat-label">Built-in Skills</div></div>
+   207|    <div class="stat"><div class="stat-num">5</div><div class="stat-label">Auth Methods</div></div>
+   208|    <div class="stat"><div class="stat-num">Free</div><div class="stat-label">AI Compute</div></div>
+   209|  </div>
+   210|</section>
+   211|
+   212|<div class="divider"></div>
+   213|
+   214|<!-- How It Works -->
+   215|<section id="how-it-works" class="center">
+   216|  <div class="section-label">How It Works</div>
+   217|  <h2 class="section-title">One platform, your choice of AI</h2>
+   218|  <p class="section-subtitle">Bring your own API key or connect via OAuth. bapX handles everything else.</p>
+   219|  <div class="steps">
+   220|    <div class="step" data-delay="0">
+   221|      <div class="step-num">01</div>
+   222|      <div class="step-icon">
+   223|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   224|      </div>
+   225|      <h3>Create Your Account</h3>
+   226|      <p>Sign up in seconds with email or Google. No credit card required — you use your own AI provider.</p>
+   227|    </div>
+   228|    <div class="step" data-delay="150">
+   229|      <div class="step-num">02</div>
+   230|      <div class="step-icon">
+   231|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+   232|      </div>
+   233|      <h3>Connect Your Provider</h3>
+   234|      <p>API key, ChatGPT OAuth, Claude OAuth, Google OAuth, or Copilot — choose your auth method.</p>
+   235|    </div>
+   236|    <div class="step" data-delay="300">
+   237|      <div class="step-num">03</div>
+   238|      <div class="step-icon">
+   239|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+   240|      </div>
+   241|      <h3>Get Things Done</h3>
+   242|      <p>Your agent works autonomously — code, research, create, browse, and execute. 100+ skills ready to go.</p>
+   243|    </div>
+   244|  </div>
+   245|</section>
+   246|
+   247|<div class="divider"></div>
+   248|
+   249|<!-- Features -->
+   250|<section id="features" class="center">
+   251|  <div class="section-label">Features</div>
+   252|  <h2 class="section-title">Everything you need in one place</h2>
+   253|  <p class="section-subtitle">Not just a chat interface — a full autonomous agent workspace.</p>
+   254|  <div class="cards">
+   255|    <div class="card" data-delay="0">
+   256|      <div class="card-icon">
+   257|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+   258|      </div>
+   259|      <h3>Multi-Model Chat</h3>
+   260|      <p>Seamlessly switch between any AI provider. One interface for GPT-4o, Claude, Gemini, Grok, DeepSeek, and more.</p>
+   261|    </div>
+   262|    <div class="card" data-delay="100">
+   263|      <div class="card-icon">
+   264|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+   265|      </div>
+   266|      <h3>100+ Built-in Skills</h3>
+   267|      <p>From web research and coding to design and data science. Skills are user-created and ready to toggle on/off.</p>
+   268|    </div>
+   269|    <div class="card" data-delay="200">
+   270|      <div class="card-icon">
+   271|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+   272|      </div>
+   273|      <h3>Sandboxed Execution</h3>
+   274|      <p>Your agent runs code in isolated Docker containers. Safe, secure, and automatically cleaned up.</p>
+   275|    </div>
+   276|    <div class="card" data-delay="300">
+   277|      <div class="card-icon">
+   278|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   279|      </div>
+   280|      <h3>OAuth Login</h3>
+   281|      <p>Connect ChatGPT Plus, Claude Max, Grok, and more via device-code OAuth. No API key needed for supported providers.</p>
+   282|    </div>
+   283|    <div class="card" data-delay="400">
+   284|      <div class="card-icon">
+   285|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+   286|      </div>
+   287|      <h3>Memory &amp; Context</h3>
+   288|      <p>Persistent memory across sessions. Your agent remembers preferences, learns from corrections, and gets smarter over time.</p>
+   289|    </div>
+   290|    <div class="card" data-delay="500">
+   291|      <div class="card-icon">
+   292|        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+   293|      </div>
+   294|      <h3>Canvas &amp; Preview</h3>
+   295|      <p>Visual workspace for diagrams, websites, and presentations. Built-in browser preview and live editing.</p>
+   296|    </div>
+   297|  </div>
+   298|</section>
+   299|
+   300|<div class="divider"></div>
+   301|
+   302|<!-- Providers -->
+   303|<section id="providers" class="center">
+   304|  <div class="section-label">Providers</div>
+   305|  <h2 class="section-title">26+ AI providers, one platform</h2>
+   306|  <p class="section-subtitle">API key or OAuth — whichever you prefer. Bring your own key and keep full control.</p>
+   307|  <div class="provider-grid">
+   308|    <div class="provider-item">OpenAI</div>
+   309|    <div class="provider-item">Anthropic</div>
+   310|    <div class="provider-item">Google Gemini</div>
+   311|    <div class="provider-item">DeepSeek</div>
+   312|    <div class="provider-item">OpenRouter</div>
+   313|    <div class="provider-item">xAI Grok</div>
+   314|    <div class="provider-item">Groq</div>
+   315|    <div class="provider-item">Mistral</div>
+   316|    <div class="provider-item">Together AI</div>
+   317|    <div class="provider-item">Cohere</div>
+   318|    <div class="provider-item">Perplexity</div>
+   319|    <div class="provider-item">Hugging Face</div>
+   320|    <div class="provider-item">MiniMax</div>
+   321|    <div class="provider-item">Kimi Moonshot</div>
+   322|    <div class="provider-item">Xiaomi MiMo</div>
+   323|    <div class="provider-item">Z.AI GLM</div>
+   324|    <div class="provider-item">Alibaba DashScope</div>
+   325|    <div class="provider-item">StepFun</div>
+   326|    <div class="provider-item">GitHub Copilot</div>
+   327|    <div class="provider-item">Qwen Portal</div>
+   328|    <div class="provider-item">ChatGPT (OAuth)</div>
+   329|    <div class="provider-item">Nous Portal</div>
+   330|  </div>
+   331|  <p style="margin-top:1.5rem;font-size:.875rem;color:var(--muted)">...and more. API key + OAuth + Copilot auth methods supported.</p>
+   332|</section>
+   333|
+   334|<div class="divider"></div>
+   335|
+   336|<!-- Skills -->
+   337|<section class="center">
+   338|  <div class="section-label">Skills</div>
+   339|  <h2 class="section-title">100+ skills at your agent's fingertips</h2>
+   340|  <p class="section-subtitle">Skills you create in your sandbox. Toggle them on/off as needed.</p>
+   341|  <div class="skill-categories">
+<h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Autonomous Agents</h4><p>Claude Code, OpenCode agents</p>
+   343|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Creative</h4><p>ASCII art, design, infographics, pixel art, sketches</p></div>
+   344|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Content</h4><p>Blog writing, YouTube summaries, presentations</p></div>
+   345|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> Development</h4><p>TDD, code review, debugging, project planning</p></div>
+   346|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> Data Science</h4><p>Jupyter notebooks, evaluation, DSPy, W&B</p></div>
+   347|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security</h4><p>Red teaming, code audit, vulnerability scanning</p></div>
+   348|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Web</h4><p>Browser automation, web scraping, API testing</p></div>
+   349|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Social</h4><p>X/Twitter, email, GIF search, Spotify, YouTube</p></div>
+   350|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg> DevOps</h4><p>GitHub workflows, Kanban, cron jobs, deployment</p></div>
+   351|    <div class="skill-cat"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Research</h4><p>ArXiv, blog monitoring, knowledge graphs, PMC</p></div>
+   352|  </div>
+   353|  <div class="skill-tags">
+   354|    <span class="skill-tag">code-review</span>
+   355|    <span class="skill-tag">design-md</span>
+   356|    <span class="skill-tag">excalidraw</span>
+   357|    <span class="skill-tag">manim-video</span>
+   358|    <span class="skill-tag">p5js</span>
+   359|    <span class="skill-tag">pixel-art</span>
+   360|    <span class="skill-tag">spotify</span>
+   361|    <span class="skill-tag">arxiv</span>
+   362|    <span class="skill-tag">llama-cpp</span>
+   363|    <span class="skill-tag">dspy</span>
+   364|    <span class="skill-tag">notion</span>
+   365|    <span class="skill-tag">obsidian</span>
+   366|    <span class="skill-tag">airtable</span>
+   367|    <span class="skill-tag">linear</span>
+   368|    <span class="skill-tag">godmode</span>
+   369|    <span class="skill-tag">minecraft</span>
+   370|    <span class="skill-tag">pokemon</span>
+   371|    <span class="skill-tag">opensandbox</span>
+   372|  </div>
+   373|</section>
+   374|
+   375|<div class="divider"></div>
+   376|
+   377|<!-- CTA -->
+   378|<section class="cta-section">
+   379|  <div class="cta-card">
+   380|    <h2>Ready to build with your AI?</h2>
+   381|    <p>Connect your provider and start using your AI agent in minutes. No credit card, no commitment.</p>
+   382|    <a href="/dashboard.html#signup" class="btn btn-primary btn-lg">Create Your Agent</a>
+   383|    <div class="cta-footer-text">Free to start. Only pay for storage used.</div>
+   384|  </div>
+   385|</section>
+   386|
+   387|<!-- Footer -->
+   388|<footer>
+   389|  <div class="footer-links">
+   390|    <a href="#hero">Home</a>
+   391|    <a href="#features">Features</a>
+   392|    <a href="#how-it-works">How It Works</a>
+   393|    <a href="#providers">Providers</a>
+   394|    <a href="/pricing.html">Pricing</a>
+   395|    <a href="/about.html">About</a>
+   396|    <a href="/docs.html">Docs</a>
+   397|    <a href="/dashboard.html#login">Sign In</a>
+   398|  </div>
+   399|  <p>&copy; 2026 bapX. All rights reserved.</p>
+   400|</footer>
+   401|
+   402|<script>
+   403|function toggleMobile(){
+   404|  var menu = document.getElementById('mobile-menu');
+   405|  menu.classList.toggle('open');
+   406|}
+   407|document.addEventListener('click', function(e){
+   408|  if(!e.target.closest('.mobile-menu') && !e.target.closest('.mobile-menu-btn')){
+   409|    document.getElementById('mobile-menu').classList.remove('open');
+   410|  }
+   411|});
+   412|
+   413|// Smooth scroll for hash links
+   414|document.querySelectorAll('a[href^="#"]').forEach(function(a){
+   415|  a.addEventListener('click', function(e){
+   416|    var target = document.querySelector(this.getAttribute('href'));
+   417|    if(target){
+   418|      e.preventDefault();
+   419|      target.scrollIntoView({behavior:'smooth'});
+   420|    }
+   421|  });
+   422|});
+   423|
+   424|// Intersection Observer for scroll animations
+   425|var observer = new IntersectionObserver(function(entries){
+   426|  entries.forEach(function(entry){
+   427|    if(entry.isIntersecting){
+   428|      entry.target.style.transitionDelay = (parseInt(entry.target.dataset.delay)||0) + 'ms';
+   429|      entry.target.classList.add('visible');
+   430|      observer.unobserve(entry.target);
+   431|    }
+   432|  });
+   433|}, {threshold:0.15});
+   434|
+   435|document.querySelectorAll('.step, .card').forEach(function(el){
+   436|  observer.observe(el);
+   437|});
+   438|
+   439|// Screenshot carousel
+   440|var showcaseImages = [
+   441|  'screenshots/hero-fullpage.png',
+   442|  'screenshots/signup-form.png',
+   443|  'screenshots/hero-fullpage.png'
+   444|];
+   445|var showcaseCaptions = [
+   446|  '<strong>bapX Dashboard</strong> &mdash; Chat, Skills, Settings &amp; Sandbox',
+   447|  '<strong>Sign Up</strong> &mdash; Create your account in seconds',
+   448|  '<strong>Multi-Provider Chat</strong> &mdash; Switch between any AI model'
+   449|];
+   450|var currentIdx = 0;
+   451|
+   452|function showScreenshot(idx){
+   453|  var img = document.getElementById('showcase-img');
+   454|  img.classList.add('fade');
+   455|  setTimeout(function(){
+   456|    img.src = showcaseImages[idx];
+   457|    document.querySelector('.showcase-overlay div').innerHTML = showcaseCaptions[idx];
+   458|    img.classList.remove('fade');
+   459|  }, 400);
+   460|  document.querySelectorAll('.showcase-dot').forEach(function(dot, i){
+   461|    dot.classList.toggle('active', i === idx);
+   462|  });
+   463|  currentIdx = idx;
+   464|}
+   465|
+   466|document.querySelectorAll('.showcase-dot').forEach(function(dot){
+   467|  dot.addEventListener('click', function(){
+   468|    showScreenshot(parseInt(this.dataset.idx));
+   469|  });
+   470|});
+   471|
+   472|// Auto-rotate screenshots every 5 seconds
+   473|setInterval(function(){
+   474|  showScreenshot((currentIdx + 1) % showcaseImages.length);
+   475|}, 5000);
+   476|</script>
+   477|</body>
+   478|</html>
