@@ -161,6 +161,22 @@ a{color:var(--accent);text-decoration:none}
 .hamburger{display:none;background:none;border:none;color:var(--fg);cursor:pointer;padding:4px;font-size:1.25rem;transition:color .2s}
 .hamburger:hover{color:var(--accent)}
 
+/* Sandbox status in right panel */
+.sandbox-bar{display:flex;align-items:center;gap:8px;padding:.5rem .75rem;border-bottom:1px solid var(--border);font-size:.75rem;flex-shrink:0;background:rgba(20,20,28,0.6)}
+.sandbox-bar .sb-status{font-weight:500}
+.sandbox-bar .sb-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.sb-running .sb-dot{background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,0.5)}
+.sb-stopped .sb-dot{background:#ef4444}
+.sb-none .sb-dot{background:var(--muted)}
+.sb-btn{padding:.2rem .5rem;font-size:.6875rem;border-radius:4px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--muted);cursor:pointer;font-family:inherit;transition:all .2s}
+.sb-btn:hover{color:var(--fg);border-color:var(--accent)}
+.sb-btn.sb-start{background:rgba(34,197,94,0.1);color:#22c55e;border-color:rgba(34,197,94,0.3)}
+.sb-btn.sb-start:hover{background:rgba(34,197,94,0.2)}
+.sb-btn.sb-stop{background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.3)}
+
+/* Provider group labels in select */
+.provider-group-label{font-size:.6875rem;color:var(--muted);padding:.375rem .75rem .125rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+
 /* Mobile Backdrop */
 .backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;animation:fadeIn .2s ease}
 
@@ -197,15 +213,10 @@ a{color:var(--accent);text-decoration:none}
 
 /* Responsive */
 @media(max-width:768px){
-  .sidebar-desktop{width:48px!important}
-  .sidebar-icon .sidebar-logo{font-size:1rem!important}
-  .sidebar-icon .sidebar-header{padding:.75rem!important}
+  .sidebar-desktop{width:0!important;overflow:hidden!important}
   .sidebar-header{padding:.75rem!important}
-  .sidebar-icon .nav-label,.sidebar-icon .user-name{display:none!important}
-  .sidebar-icon .sidebar-user{padding:.5rem!important}
-  .sidebar-icon .sidebar-user .avatar{width:28px!important;height:28px!important;font-size:.75rem}
   .hamburger{display:block!important}
-  .sidebar.mobile-expanded{width:256px!important;position:fixed!important;left:0;top:0;bottom:0;z-index:100;box-shadow:4px 0 20px rgba(0,0,0,0.5)}
+  .sidebar.mobile-expanded{width:256px!important;position:fixed!important;left:0;top:0;bottom:0;z-index:100;box-shadow:4px 0 20px rgba(0,0,0,0.5);overflow-y:auto!important}
   .sidebar.mobile-expanded .nav-label,.sidebar.mobile-expanded .user-name{display:inline!important}
   .sidebar.mobile-expanded .sidebar-logo{font-size:1.25rem!important}
   .sidebar.mobile-expanded .sidebar-user .avatar{width:32px!important;height:32px!important;font-size:.8125rem!important}
@@ -406,6 +417,11 @@ a{color:var(--accent);text-decoration:none}
           <button class="rp-tab active" data-tab="canvas" onclick="switchRpTab('canvas')">Canvas</button>
           <button class="rp-tab" data-tab="browser" onclick="switchRpTab('browser')">Browser</button>
           <button class="rp-tab" data-tab="terminal" onclick="switchRpTab('terminal')">Terminal</button>
+        </div>
+        <div class="sandbox-bar sb-none" id="sandbox-bar">
+          <span class="sb-dot"></span>
+          <span class="sb-status" id="sandbox-status-label">Sandbox — Stopped</span>
+          <button class="sb-btn sb-start" id="sandbox-toggle-btn" onclick="toggleSandbox()">Start</button>
         </div>
         <div class="right-panel-content" id="rp-content">
           <div class="rp-placeholder" data-tab="canvas">
@@ -613,11 +629,21 @@ async function loadProviders(){
     allProviders = data;
     var sel = document.getElementById('provider-select');
     sel.innerHTML = '<option value="">Select provider...</option>';
-    (data.api_key || []).forEach(function(p){
-      var o = document.createElement('option');
-      o.value = p.id; o.textContent = p.name;
-      sel.appendChild(o);
-    });
+
+    // Add API key providers group
+    if(data.api_key && data.api_key.length){
+      var grp = document.createElement('optgroup');
+      grp.label = '── API Key ──';
+      data.api_key.forEach(function(p){
+        var o = document.createElement('option');
+        o.value = p.id; o.textContent = p.name;
+        grp.appendChild(o);
+      });
+      sel.appendChild(grp);
+    }
+
+    // Render OAuth providers
+    renderOAuthProviders([]);
   }catch(e){
     console.error('Failed to load providers', e);
   }

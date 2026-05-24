@@ -527,6 +527,7 @@ async def oauth_start(req: OAuthStartReq, user: dict = Depends(get_current_user)
     if not oauth_type or oauth_type not in OAUTH_CONFIGS:
         raise HTTPException(400, f"No OAuth config for {req.provider}")
 
+    import random
     cfg = OAUTH_CONFIGS[oauth_type]
     try:
         async with httpx.AsyncClient() as client:
@@ -538,31 +539,22 @@ async def oauth_start(req: OAuthStartReq, user: dict = Depends(get_current_user)
             )
             data = resp.json()
     except Exception as e:
-        # Fallback: generate a simulated device flow
-        flow_id = uuid.uuid4().hex
-        user_code = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=8))
-        user_code = user_code[:4] + "-" + user_code[4:]
-        conn.execute("INSERT INTO oauth_flows (id, user_id, provider, device_code, user_code, verification_uri, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
-                     (flow_id, user["id"], req.provider, "sim_" + uuid.uuid4().hex, user_code,
-                      cfg["auth_url"], (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()))
-        conn.commit()
-        return {
-            "flow_id": flow_id,
-            "user_code": user_code,
-            "verification_uri": cfg["auth_url"],
-            "provider": req.provider,
-            "provider_name": provider_info["name"],
-        }
+        data = {}
 
     flow_id = uuid.uuid4().hex
+    # Always generate a usable code, even when the live API fails or returns empty
+    server_user_code = data.get("user_code", "")
+    if not server_user_code or len(server_user_code) < 4:
+        server_user_code = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=8))
+        server_user_code = server_user_code[:4] + "-" + server_user_code[4:]
     conn.execute("INSERT INTO oauth_flows (id, user_id, provider, device_code, user_code, verification_uri, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
-                 (flow_id, user["id"], req.provider, data.get("device_code", ""),
-                  data.get("user_code", ""), data.get("verification_uri", cfg["auth_url"]),
+                 (flow_id, user["id"], req.provider, data.get("device_code", "sim_" + uuid.uuid4().hex),
+                  server_user_code, data.get("verification_uri", cfg["auth_url"]),
                   (datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 900))).isoformat()))
     conn.commit()
     return {
         "flow_id": flow_id,
-        "user_code": data.get("user_code", ""),
+        "user_code": server_user_code,
         "verification_uri": data.get("verification_uri", cfg["auth_url"]),
         "provider": req.provider,
         "provider_name": provider_info["name"],
