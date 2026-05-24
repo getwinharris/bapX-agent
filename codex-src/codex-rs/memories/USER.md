@@ -1,0 +1,3 @@
+The user is Harris, CEO of bapX. They want things built immediately with no analysis or planning — just execution. They run a browser-only AI agent platform at bapx.in where users authenticate with their own model accounts. The platform uses OpenAI Agents SDK + OpenSandbox Docker sandboxes. Codex is the forked agent runtime in the monorepo. The user prefers direct, fast responses and corrects immediately if something is wrong. Always build with the documents and research already prepared, not from imagination.
+§
+The user is based in India (Bapx Media Hub). They're the CEO and founder. They communicate directly and expect fast execution.
