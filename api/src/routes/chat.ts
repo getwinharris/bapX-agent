@@ -5,29 +5,52 @@ import db from '../db.js'
 import { authMiddleware } from '../middleware/auth.js'
 
 /**
+ * In-memory cache for sandbox endpoint status.
+ * TTL: 15 seconds — avoids 3 subprocess calls per /chat/send.
+ */
+const sandboxCache = new Map<string, { endpoint: string | null; ts: number }>()
+const SANDBOX_CACHE_TTL = 15_000 // 15 seconds
+
+/**
  * Get the sandbox agent endpoint for a user if their sandbox is running.
+ * Results are cached in-memory to avoid subprocess overhead on every message.
  */
 function getSandboxEndpoint(username: string): string | null {
+  // Check cache first
+  const cached = sandboxCache.get(username)
+  if (cached && Date.now() - cached.ts < SANDBOX_CACHE_TTL) {
+    return cached.endpoint
+  }
+
   try {
     const containerName = `bapx-sandbox-${username}`
     const status = execSync(
       `docker ps --filter name=^/${containerName}$ --format '{{.Status}}'`,
       { encoding: 'utf-8', timeout: 5_000 }
     ).trim()
-    if (!status) return null
+    if (!status) {
+      sandboxCache.set(username, { endpoint: null, ts: Date.now() })
+      return null
+    }
     const portStr = execSync(
       `docker port ${containerName} 8765/tcp 2>/dev/null | head -1 | sed 's/.*://'`,
       { encoding: 'utf-8', timeout: 5_000 }
     ).trim()
-    if (!portStr) return null
-    // Verify agent is healthy
+    if (!portStr) {
+      sandboxCache.set(username, { endpoint: null, ts: Date.now() })
+      return null
+    }
+    // Verify agent is healthy (includes auth)
+    const internalKey = process.env.BAPX_INTERNAL_API_KEY || ''
     const health = execSync(
-      `curl -sf http://127.0.0.1:${portStr}/health`,
+      `curl -sf -H "Authorization: Bearer ${internalKey}" http://127.0.0.1:${portStr}/health`,
       { encoding: 'utf-8', timeout: 5_000 }
     ).trim()
-    if (health) return `http://127.0.0.1:${portStr}`
-    return null
+    const endpoint = health ? `http://127.0.0.1:${portStr}` : null
+    sandboxCache.set(username, { endpoint, ts: Date.now() })
+    return endpoint
   } catch {
+    sandboxCache.set(username, { endpoint: null, ts: Date.now() })
     return null
   }
 }
@@ -93,7 +116,7 @@ export async function chatRoutes(app: FastifyInstance) {
       ...history.map((m: any) => {
         const msg: any = { role: m.role, content: m.content }
         if (m.tool_calls) {
-          try { msg.tool_calls = JSON.parse(m.tool_calls) } catch (e) { msg.tool_calls = [] }
+          try { msg.tool_calls = JSON.parse(m.tool_calls) } catch { /* invalid JSON in stored tool_calls — treat as empty */ msg.tool_calls = [] }
         }
         if (m.tool_call_id) msg.tool_call_id = m.tool_call_id
         if (m.name) msg.name = m.name
@@ -112,7 +135,10 @@ export async function chatRoutes(app: FastifyInstance) {
       try {
         const sseRes = await fetch(`${sandboxEndpoint}/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.BAPX_INTERNAL_API_KEY || ''}`,
+          },
           body: JSON.stringify({
             message,
             session_id: sid,
@@ -122,7 +148,7 @@ export async function chatRoutes(app: FastifyInstance) {
         })
         if (!sseRes.ok) {
           const errText = await sseRes.text()
-          reply.raw.write(`data: ${JSON.stringify({ error: `Sandbox error: ${sseRes.status}` })}\n\n`)
+          reply.raw.write(`data: ${JSON.stringify({ error: `Sandbox error: ${sseRes.status} — ${errText.slice(0, 200)}` })}\n\n`)
           reply.raw.end()
           return
         }

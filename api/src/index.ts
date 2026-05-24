@@ -5,11 +5,22 @@ import { authRoutes } from './routes/auth.js'
 import { userRoutes } from './routes/user.js'
 import { chatRoutes } from './routes/chat.js'
 import { sandboxRoutes } from './routes/sandbox.js'
+import { requireJwtSecret } from './middleware/auth.js'
 
 const PORT = parseInt(process.env.PORT || '3001', 10)
 const HOST = process.env.HOST || '0.0.0.0'
 
-const app = Fastify({ logger: true })
+// Validate JWT_SECRET at startup (fail fast)
+requireJwtSecret()
+
+const app = Fastify({
+  logger: {
+    redact: {
+      paths: ['req.headers.authorization', 'req.body.api_key', 'req.body.password', 'req.body.apiKey'],
+      censor: '***REDACTED***',
+    },
+  },
+})
 
 // Rate limiting
 await app.register(rateLimit, {

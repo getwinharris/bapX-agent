@@ -344,11 +344,14 @@ class GoogleAdapter implements ProviderAdapter {
 
     const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta';
     const modelName = config.model.startsWith('models/') ? config.model : `models/${config.model}`;
-    const url = `${baseUrl}/${modelName}:generateContent?key=${config.apiKey}`;
+    const url = `${baseUrl}/${modelName}:generateContent`;
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': config.apiKey,
+      },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(120000),
     });

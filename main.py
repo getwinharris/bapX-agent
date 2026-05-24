@@ -1,15 +1,34 @@
 """bapx.in API — auth for landing page signup/login"""
 import os, uuid, json, sqlite3
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from passlib.hash import bcrypt
 from datetime import datetime, timezone, timedelta
 import jwt
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+def _rate_key(request: Request) -> str:
+    """Use X-Forwarded-For for real client IP behind Fastify proxy."""
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host or "unknown"
+    return "unknown"
 
 app = FastAPI(title="bapX")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# Rate limiting — defense-in-depth behind Fastify proxy
+limiter = Limiter(key_func=_rate_key)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Determine allowed origins for CORS
+CORS_ORIGINS = os.environ.get("BAPX_CORS_ORIGINS", "https://bapx.in,https://app.bapx.in,http://localhost:5173").split(",")
+
+app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
 
 JWT_SECRET: str = os.environ.get("BAPX_JWT_SECRET", "")
 if not JWT_SECRET:
@@ -57,7 +76,8 @@ class LoginReq(BaseModel):
 
 
 @app.post("/api/signup")
-def signup(req: SignupReq):
+@limiter.limit("10/minute")
+def signup(req: SignupReq, request: Request):
     if not req.password or len(req.password) < 8:
         raise HTTPException(400, "Password must be at least 8 characters")
     if "@" not in req.email or "." not in req.email.split("@")[-1]:
@@ -83,7 +103,8 @@ def signup(req: SignupReq):
 
 
 @app.post("/api/login")
-def login(req: LoginReq):
+@limiter.limit("20/minute")
+def login(req: LoginReq, request: Request):
     row = conn.execute("SELECT password_hash, name FROM users WHERE email = ?", (req.email,)).fetchone()
     if not row or not bcrypt.verify(req.password, row["password_hash"]):
         raise HTTPException(401, "Invalid credentials")

@@ -215,9 +215,10 @@ export function registerBuiltinTools(): void {
                 timeout: 30000,
               });
               results = output.trim().split('\n').filter(Boolean);
-              if (results.length > limit) {
+              const totalMatches = results.length;
+              if (totalMatches > limit) {
                 results = results.slice(0, limit);
-                results.push(`... and ${results.length - limit} more results`);
+                results.push(`... and ${totalMatches - limit} more results`);
               }
             } catch {
               results = ['No matches found'];

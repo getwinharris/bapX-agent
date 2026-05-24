@@ -128,7 +128,7 @@ export class SkillsSystem {
       for (const file of files) {
         const filePath = path.join(this.skillsDir, file);
         if (!fs.statSync(filePath).isFile()) continue;
-        if (!file.endsWith('.md') && !file.endsWith('.md')) continue;
+        if (!file.endsWith('.md')) continue;
 
         try {
           const skill = this.loadFromFile(filePath);

@@ -1,23 +1,33 @@
 import { FastifyInstance } from 'fastify'
 import { execSync } from 'child_process'
+import { writeFileSync, unlinkSync, mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 import db from '../db.js'
 import { authMiddleware } from '../middleware/auth.js'
 
+/** Cache: has the Docker image been confirmed present? */
+let _imageChecked = false
+
 /**
  * Build the sandbox image if it doesn't exist.
+ * Cached after first check to avoid repeated `docker image inspect` calls.
  * Returns true if build was needed, false if already present.
  */
 function ensureImage(): boolean {
+  if (_imageChecked) return false
   try {
     execSync('docker image inspect bapx-agent:latest 2>/dev/null', { stdio: 'ignore' })
+    _imageChecked = true
     return false // image exists
   } catch {
-    // Build the image
-    const buildDir = '/root/Dev/bapx'
+    // Image not found — build it
+    const buildDir = process.env.BAPX_BUILD_DIR || '/root/Dev/bapx'
     execSync(
       `docker build -t bapx-agent:latest -f ${buildDir}/docker/Dockerfile.agent ${buildDir}`,
       { stdio: 'inherit', timeout: 120_000 }
     )
+    _imageChecked = true
     return true
   }
 }
@@ -62,15 +72,19 @@ function startSandbox(_userId: string, username: string, env: Record<string, str
   } catch { /* best-effort cleanup – container may not exist */ }
 
   // Find next available port (8765 baseline, offset by user's index)
-  const port = 8765 + Math.abs(hashCode(username) % 100)
+  const basePort = 8765 + Math.abs(hashCode(username) % 100)
+  const port = findAvailablePort(basePort)
 
-  // Build env vars
-  const envFlags = Object.entries(env)
-    .filter(([, v]) => v)
-    .map(([k, v]) => `-e ${k}=${shellEscape(v)}`)
-    .join(' ')
-
+  // Write env vars to a temp file to avoid shell injection via -e flags
+  let envFilePath: string | null = null
   try {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'bapx-sandbox-'))
+    envFilePath = join(tmpDir, 'env.list')
+    const envLines = Object.entries(env)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}=${v.replace(/\n/g, '\\n')}`)
+    writeFileSync(envFilePath, envLines.join('\n') + '\n', 'utf-8')
+
     execSync(
       `docker run -d \
         --name ${containerName} \
@@ -79,7 +93,7 @@ function startSandbox(_userId: string, username: string, env: Record<string, str
         --memory-reservation 384m \
         --cpus 0.5 \
         -p ${port}:8765 \
-        ${envFlags} \
+        --env-file ${envFilePath} \
         bapx-agent:latest`,
       { stdio: 'inherit', timeout: 30_000 }
     )
@@ -87,7 +101,31 @@ function startSandbox(_userId: string, username: string, env: Record<string, str
   } catch (err: any) {
     console.error('Failed to start sandbox:', err.message)
     return null
+  } finally {
+    if (envFilePath) {
+      try { unlinkSync(envFilePath) } catch { /* temp file cleanup */ }
+      try { rmSync(join(envFilePath!, '..'), { recursive: true, force: true }) } catch { /* dir cleanup */ }
+    }
   }
+}
+
+/**
+ * Find an available host port, trying the preferred port first
+ * then scanning upwards. Uses ss (socket statistics) — instant, no Docker.
+ */
+function findAvailablePort(preferred: number): number {
+  for (let offset = 0; offset < 20; offset++) {
+    const port = preferred + offset
+    try {
+      execSync(`ss -tln src :${port} 2>/dev/null | grep -q .`, { stdio: 'ignore', timeout: 2_000 })
+      // If the command succeeds, ss found something listening on that port
+    } catch {
+      // Command failed (grep found nothing or ss errored) — port is free
+      return port
+    }
+  }
+  // Last resort — let Docker pick the port
+  return preferred
 }
 
 function stopSandbox(containerName: string): boolean {
@@ -97,10 +135,6 @@ function stopSandbox(containerName: string): boolean {
   } catch {
     return false
   }
-}
-
-function shellEscape(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`
 }
 
 function hashCode(s: string): number {
@@ -159,6 +193,7 @@ export async function sandboxRoutes(app: FastifyInstance) {
       BAPX_AGENT_NAME: user.agent_name || 'BapX',
       BAPX_USER_NAME: user.name || user.username,
       BAPX_CUSTOM_BASE_URL: process.env.CUSTOM_BASE_URL || '',
+      BAPX_INTERNAL_API_KEY: process.env.BAPX_INTERNAL_API_KEY || '',
     })
 
     if (!sandboxInfo) {
@@ -190,7 +225,9 @@ export async function sandboxRoutes(app: FastifyInstance) {
       ).trim()
       if (!portStr) return { status: 'not_running' }
 
-      const res = await fetch(`http://127.0.0.1:${portStr}/health`)
+      const res = await fetch(`http://127.0.0.1:${portStr}/health`, {
+        headers: { 'Authorization': `Bearer ${process.env.BAPX_INTERNAL_API_KEY || ''}` }
+      })
       const data = await res.json()
       return { status: 'running', health: data }
     } catch {
