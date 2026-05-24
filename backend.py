@@ -2,7 +2,7 @@
 bapX Backend — Python FastAPI
 Model connections: API key providers (OpenAI, Anthropic, Google, etc.) + OAuth device flow.
 """
-import os, uuid, json, sqlite3, hashlib, hmac, time, httpx, asyncio, tempfile
+import os, uuid, json, sqlite3, hashlib, hmac, time, httpx, asyncio, tempfile, stripe
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -69,6 +69,9 @@ conn.commit()
 for col_sql in [
     "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN stripe_sub_id TEXT DEFAULT ''",
+    "ALTER TABLE users ADD COLUMN stripe_status TEXT DEFAULT 'none'",
+    "ALTER TABLE users ADD COLUMN storage_used INTEGER DEFAULT 0",
 ]:
     try: conn.execute(col_sql)
     except: pass
@@ -1183,6 +1186,61 @@ async def v1_models(user: dict = Depends(get_current_user)):
 @app.post("/v1/models")
 async def v1_models_post(user: dict = Depends(get_current_user)):
     return await v1_models(user)
+
+# ── Billing ENDPOINTS ──
+@app.post('/api/billing/create-checkout')
+async def create_checkout(user: dict = Depends(get_current_user)):
+    """Create Stripe checkout session for storage plan."""
+    sk = conn.execute("SELECT value FROM admin_config WHERE key = 'stripe_secret_key'").fetchone()
+    bp = conn.execute("SELECT value FROM admin_config WHERE key = 'billing_plan_base_price'").fetchone()
+    if not sk or not sk['value']:
+        raise HTTPException(400, 'Stripe not configured. Set stripe_secret_key in admin.')
+    stripe.api_key = sk['value']
+    price = int(bp['value']) if bp and bp['value'] else 5
+    try:
+        sess = stripe.checkout.Session.create(
+            mode='subscription',
+            line_items=[{'price_data': {'currency': 'usd', 'product_data': {'name': 'bapX Starter - 5GB'}, 'unit_amount': price * 100}, 'quantity': 1}],
+            metadata={'user_id': user['id']},
+            success_url='https://bapx.in/dashboard?billing=success',
+            cancel_url='https://bapx.in/dashboard?billing=canceled',
+        )
+        return {'url': sess.url, 'session_id': sess.id}
+    except Exception as e:
+        raise HTTPException(500, f'Stripe error: {str(e)}')
+
+@app.post('/api/billing/webhook')
+async def billing_webhook(request: Request):
+    """Stripe webhook for subscription events."""
+    sk = conn.execute("SELECT value FROM admin_config WHERE key = 'stripe_secret_key'").fetchone()
+    ws = conn.execute("SELECT value FROM admin_config WHERE key = 'stripe_webhook_secret'").fetchone()
+    if sk and sk['value']:
+        stripe.api_key = sk['value']
+    payload = await request.body()
+    sig = request.headers.get('stripe-signature', '')
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, ws['value'] if ws else '')
+    except Exception:
+        raise HTTPException(400, 'Invalid webhook signature')
+    if event['type'] == 'checkout.session.completed':
+        sess_obj = event['data']['object']
+        uid = sess_obj.get('metadata', {}).get('user_id', '')
+        if uid:
+            sub_id = sess_obj.get('subscription', '')
+            conn.execute("UPDATE users SET stripe_sub_id = ?, stripe_status = 'active' WHERE id = ?", (sub_id, uid))
+            conn.commit()
+    return {'status': 'ok'}
+
+@app.get('/api/billing/subscription')
+def get_subscription(user: dict = Depends(get_current_user)):
+    """Get user's current subscription and storage usage."""
+    return {
+        'status': user.get('stripe_status', 'none'),
+        'plan': 'Starter' if user.get('stripe_status') == 'active' else 'None',
+        'storage_limit_gb': 5 if user.get('stripe_status') == 'active' else 0,
+        'storage_used_bytes': user.get('storage_used', 0),
+        'subscription_id': user.get('stripe_sub_id', None),
+    }
 
 # ── Health ──
 @app.get("/health")
