@@ -1,38 +1,117 @@
 """
-bapX Backend — Python FastAPI
-Model connections: API key providers (OpenAI, Anthropic, Google, etc.) + OAuth device flow.
+bapX Backend — Minimal FastAPI
+Only: user auth (signup/login/password-reset), email (SMTP), sandbox lifecycle, billing.
+Everything else (chat, skills, memory, models, agent) handled by Codex inside sandbox.
 """
-import os, uuid, json, sqlite3, hashlib, hmac, time, httpx, asyncio, tempfile, stripe
+import os, uuid, json, sqlite3, hashlib, time, httpx, asyncio, smtplib, random, string
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Request, Depends
+from email.mime.text import MIMEText
+from fastapi import FastAPI, HTTPException, Request, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
-from fastapi.background import BackgroundTasks
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, field_validator
-import hashlib, secrets
+from pydantic import BaseModel
 import jwt
+import stripe
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
-from agent_runtime import stream_agent_response
-from sandbox_manager import start_sandbox, stop_sandbox, get_sandbox_status, exec_in_sandbox
-from agent_orchestrator import route_user_message
 from opensandbox import Sandbox
+from opensandbox.config.connection import ConnectionConfig
+from datetime import timedelta
 
 # ── Config ──
-JWT_SECRET: str = os.environ.get("BAPX_JWT_SECRET", "")
+JWT_SECRET = os.environ.get("BAPX_JWT_SECRET", "")
 if not JWT_SECRET or len(JWT_SECRET) < 32:
     raise RuntimeError("FATAL: Set BAPX_JWT_SECRET (32+ chars)")
-JWT_ALGO = "HS256"
-JWT_EXPIRY_HOURS = 72
+JWT_ALGO, JWT_EXPIRY_HOURS = "HS256", 72
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = Path(os.environ.get("BAPX_DATA_DIR", str(BASE_DIR / "data")))
-SKILLS_DIR = DATA_DIR / "skills"
-SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+SANDBOX_BASE_URL = "http://127.0.0.1:8080"
+
+# ── OpenSandbox helpers (inline — no wrapper file) ──
+_sandbox_conn = None
+def _sb_conn():
+    global _sandbox_conn
+    if _sandbox_conn is None:
+        _sandbox_conn = ConnectionConfig(base_url=SANDBOX_BASE_URL, api_key="")
+    return _sandbox_conn
+
+_sandbox_cache: dict[str, str] = {}  # user_id → sandbox_id
+
+async def _sb_start(user_id: str, username: str) -> str:
+    """Create sandbox via OpenSandbox SDK. Returns sandbox_id."""
+    if user_id in _sandbox_cache:
+        try:
+            sb = Sandbox.connect(_sandbox_cache[user_id], _sb_conn())
+            info = await sb.get_info()
+            if info.status.state == "RUNNING":
+                return _sandbox_cache[user_id]
+        except:
+            pass
+    try:
+        sb = await Sandbox.create("ubuntu", connection_config=_sb_conn(),
+            resource={"cpu": "500m", "memory": "1Gi"},
+            metadata={"user_id": user_id, "name": username},
+            timeout=timedelta(hours=1), skip_health_check=True)
+        sid = str(sb.id) if hasattr(sb, 'id') else ""
+        if sid:
+            _sandbox_cache[user_id] = sid
+        return sid
+    except Exception as e:
+        print(f"[Sandbox] Create failed: {e}")
+        return ""
+
+async def _sb_exec(user_id: str, cmd: str) -> dict:
+    """Run command in user's sandbox."""
+    sid = _sandbox_cache.get(user_id)
+    if not sid:
+        return {"output": "", "error": "No sandbox"}
+    try:
+        sb = Sandbox.connect(sid, _sb_conn())
+        res = await sb.commands.run(cmd)
+        text = ""
+        try:
+            text = res.logs.stdout[0].text
+        except:
+            text = str(res)
+        return {"output": text, "exit_code": 0}
+    except Exception as e:
+        return {"output": "", "error": str(e)}
+
+async def _sb_stop(user_id: str) -> dict:
+    """Stop user's sandbox."""
+    sid = _sandbox_cache.pop(user_id, None)
+    if sid:
+        try:
+            sb = Sandbox.connect(sid, _sb_conn())
+            await sb.kill()
+        except:
+            pass
+    return {"deleted": True}
+
+async def _sb_status(user_id: str) -> dict:
+    """Get sandbox status."""
+    sid = _sandbox_cache.get(user_id)
+    if not sid:
+        return {"status": "none"}
+    try:
+        sb = Sandbox.connect(sid, _sb_conn())
+        info = await sb.get_info()
+        return {"status": "running", "sandbox_id": sid, "info": str(info)[:200]}
+    except:
+        return {"status": "stopped", "sandbox_id": sid}
+
+# ── Email Config ──
+SMTP_HOST = os.environ.get("BAPX_SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("BAPX_SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("BAPX_SMTP_USER", "")
+SMTP_PASS = os.environ.get("BAPX_SMTP_PASS", "")
+SMTP_FROM = os.environ.get("BAPX_SMTP_FROM", "noreply@bapx.in")
 
 # ── DB ──
 conn = sqlite3.connect(str(DATA_DIR / "bapx.db"), check_same_thread=False, timeout=10)
@@ -41,44 +120,42 @@ conn.execute("PRAGMA journal_mode=WAL")
 conn.execute("PRAGMA busy_timeout=5000")
 conn.execute("PRAGMA foreign_keys=ON")
 
-conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL DEFAULT '', email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, age TEXT DEFAULT '', nature TEXT DEFAULT '', agent_name TEXT DEFAULT 'BapX', bio TEXT DEFAULT '', soul_md TEXT DEFAULT '', api_key TEXT DEFAULT '', provider TEXT DEFAULT 'openai', model TEXT DEFAULT '', oauth_tokens TEXT DEFAULT '{}', skills_enabled TEXT DEFAULT '[]', is_admin INTEGER DEFAULT 0, banned INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))")
-conn.execute("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT DEFAULT 'New Chat', messages TEXT DEFAULT '[]', created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
-conn.execute("CREATE TABLE IF NOT EXISTS oauth_flows (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, provider TEXT NOT NULL, device_code TEXT NOT NULL, user_code TEXT NOT NULL, verification_uri TEXT NOT NULL, status TEXT DEFAULT 'pending', expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
-conn.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, session_id TEXT NOT NULL DEFAULT '', key TEXT NOT NULL, value TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
-# Admin tables
-conn.execute("CREATE TABLE IF NOT EXISTS admin_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')))")
-conn.execute("CREATE TABLE IF NOT EXISTS admin_mail (id INTEGER PRIMARY KEY AUTOINCREMENT, from_addr TEXT NOT NULL, to_addr TEXT NOT NULL, subject TEXT, body TEXT, read INTEGER DEFAULT 0, received_at TEXT DEFAULT (datetime('now')))")
-conn.execute("CREATE TABLE IF NOT EXISTS admin_notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, severity TEXT DEFAULT 'info', read INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))")
-conn.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, session_id TEXT NOT NULL DEFAULT '', key TEXT NOT NULL, value TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (user_id) REFERENCES users(id))")
-conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)")
-conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id)")
+conn.execute("""CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL DEFAULT '',
+    email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, email_verified INTEGER DEFAULT 0,
+    age TEXT DEFAULT '', bio TEXT DEFAULT '', is_admin INTEGER DEFAULT 0, banned INTEGER DEFAULT 0,
+    sandbox_id TEXT DEFAULT '', stripe_sub_id TEXT DEFAULT '', stripe_status TEXT DEFAULT 'none',
+    storage_used INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+)""")
+conn.execute("""CREATE TABLE IF NOT EXISTS verification_codes (
+    id TEXT PRIMARY KEY, user_id TEXT, email TEXT NOT NULL, code TEXT NOT NULL,
+    purpose TEXT NOT NULL, expires_at TEXT NOT NULL, used INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+)""")
 conn.execute("""CREATE TABLE IF NOT EXISTS sandboxes (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    sandbox_id TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
-    created_at TEXT DEFAULT (datetime('now')),
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, sandbox_id TEXT NOT NULL,
+    status TEXT DEFAULT 'pending', created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id)
 )""")
-# Add sandbox_id column to users if not present (idempotent migration)
-try:
-    conn.execute("ALTER TABLE users ADD COLUMN sandbox_id TEXT DEFAULT ''")
-except Exception:
-    pass
-# Add cached_models column for dynamic model fetching
-try:
-    conn.execute("ALTER TABLE users ADD COLUMN cached_models TEXT DEFAULT '[]'")
-except Exception:
-    pass
-# Add projects column for user projects
-try:
-    conn.execute("ALTER TABLE users ADD COLUMN projects TEXT DEFAULT '[]'")
-except Exception:
-    pass
-conn.commit()
+conn.execute("""CREATE TABLE IF NOT EXISTS admin_config (
+    key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now'))
+)""")
+conn.execute("""CREATE TABLE IF NOT EXISTS admin_mail (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, from_addr TEXT NOT NULL, to_addr TEXT NOT NULL,
+    subject TEXT, body TEXT, read INTEGER DEFAULT 0, received_at TEXT DEFAULT (datetime('now'))
+)""")
+conn.execute("""CREATE TABLE IF NOT EXISTS admin_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, title TEXT NOT NULL,
+    message TEXT NOT NULL, severity TEXT DEFAULT 'info', read INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+)""")
+# Migration: add extra columns
 for col_sql in [
     "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN sandbox_id TEXT DEFAULT ''",
     "ALTER TABLE users ADD COLUMN stripe_sub_id TEXT DEFAULT ''",
     "ALTER TABLE users ADD COLUMN stripe_status TEXT DEFAULT 'none'",
     "ALTER TABLE users ADD COLUMN storage_used INTEGER DEFAULT 0",
@@ -87,52 +164,63 @@ for col_sql in [
     except: pass
 conn.commit()
 
-# ── Seed admin user ──
-admin_exists = conn.execute("SELECT id FROM users WHERE is_admin = 1").fetchone()
-if not admin_exists:
-    admin_pw = os.environ.get("BAPX_ADMIN_PASSWORD", "admin123")
-    admin_uid = uuid.uuid4().hex
-    conn.execute("INSERT INTO users (id, username, name, email, password_hash, is_admin) VALUES (?, ?, ?, ?, ?, 1)",
-        (admin_uid, "admin", "Admin", "admin@bapx.in", hashlib.sha256(admin_pw.encode()).hexdigest()))
+# Seed admin user
+if not conn.execute("SELECT id FROM users WHERE is_admin = 1").fetchone():
+    pw = os.environ.get("BAPX_ADMIN_PASSWORD", "admin123")
+    uid = uuid.uuid4().hex
+    conn.execute("INSERT INTO users (id, username, name, email, password_hash, is_admin, email_verified) VALUES (?, ?, ?, ?, ?, 1, 1)",
+        (uid, "admin", "Admin", "admin@bapx.in", hashlib.sha256(pw.encode()).hexdigest()))
     conn.commit()
-    print(f"[Admin] Seeded admin user: admin@bapx.in (pw: {'[ENV]' if 'BAPX_ADMIN_PASSWORD' in os.environ else 'admin123'})")
+    print(f"[Admin] admin@bapx.in / pw: {'[ENV]' if 'BAPX_ADMIN_PASSWORD' in os.environ else 'admin123'}")
 
-# Seed default admin config
 DEFAULT_CONFIG = {
     "stripe_secret_key": "", "stripe_webhook_secret": "",
-    "google_oauth_client_id": "", "google_oauth_client_secret": "",
-    "smtp_host": "", "smtp_port": "587", "smtp_user": "", "smtp_pass": "",
+    "smtp_host": SMTP_HOST, "smtp_port": str(SMTP_PORT),
+    "smtp_user": SMTP_USER, "smtp_pass": SMTP_PASS,
     "admin_email": "", "billing_plan_base_price": "5",
     "billing_storage_price_per_gb": "1",
 }
 for k, v in DEFAULT_CONFIG.items():
-    existing = conn.execute("SELECT key FROM admin_config WHERE key = ?", (k,)).fetchone()
-    if not existing:
+    if not conn.execute("SELECT key FROM admin_config WHERE key = ?", (k,)).fetchone():
         conn.execute("INSERT INTO admin_config (key, value) VALUES (?, ?)", (k, v))
 conn.commit()
 
 # ── FastAPI App ──
-app = FastAPI(title="bapX API", version="0.2.0")
+app = FastAPI(title="bapX API", version="0.3.0")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 CORS_ORIGINS = os.environ.get("BAPX_CORS_ORIGINS",
     "https://bapx.in,https://agent.bapx.in,http://localhost:7654").split(",")
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS,
     allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 
+# ── Models ──
+class SignupReq(BaseModel):
+    username: str; name: str; email: str; password: str; age: str = ""; bio: str = ""
+class LoginReq(BaseModel):
+    email: str; password: str
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None; age: Optional[str] = None; bio: Optional[str] = None
+class ForgotPasswordReq(BaseModel):
+    email: str
+class ResetPasswordReq(BaseModel):
+    email: str; code: str; password: str
+class VerifyEmailReq(BaseModel):
+    email: str; code: str
+class SandboxExecReq(BaseModel):
+    command: str; language: str = "bash"
+
 # ── Auth Helpers ──
 def make_token(user_id: str) -> str:
-    return jwt.encode({
-        "sub": user_id, "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_HOURS),
-    }, JWT_SECRET, algorithm=JWT_ALGO)
+    return jwt.encode({"sub": user_id, "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_HOURS)},
+        JWT_SECRET, algorithm=JWT_ALGO)
 
 def get_current_user(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
-        raise HTTPException(401, "Missing or invalid token")
+        raise HTTPException(401, "Missing token")
     try:
         payload = jwt.decode(auth[7:], JWT_SECRET, algorithms=[JWT_ALGO])
     except jwt.ExpiredSignatureError:
@@ -142,249 +230,41 @@ def get_current_user(request: Request) -> dict:
     user = conn.execute("SELECT * FROM users WHERE id = ?", (payload["sub"],)).fetchone()
     if not user:
         raise HTTPException(401, "User not found")
+    if user["banned"]:
+        raise HTTPException(403, "Account banned")
     return dict(user)
 
 def get_admin_user(request: Request) -> dict:
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(401, "Missing or invalid token")
+    user = get_current_user(request)
+    if not user.get("is_admin"):
+        raise HTTPException(403, "Admin required")
+    return user
+
+def gen_code(n=8) -> str:
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=n))
+
+def send_email(to: str, subject: str, body: str):
+    """Send email via SMTP (GitHub-style format)."""
+    if not SMTP_HOST:
+        return
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = SMTP_FROM
+    msg["To"] = to
     try:
-        payload = jwt.decode(auth[7:], JWT_SECRET, algorithms=[JWT_ALGO])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(401, "Token expired")
-    except Exception:
-        raise HTTPException(401, "Invalid token")
-    user = conn.execute("SELECT * FROM users WHERE id = ? AND is_admin = 1", (payload["sub"],)).fetchone()
-    if not user:
-        raise HTTPException(403, "Admin access required")
-    return dict(user)
-
-def mask_value(val: str) -> str:
-    """Mask sensitive config values for GET responses."""
-    s = val.strip()
-    if not s:
-        return ""
-    if len(s) <= 8:
-        return "••••"
-    return s[:4] + "••••" + s[-4:]
-
-def create_notification(type_: str, title: str, message: str, severity: str = "info"):
-    conn.execute("INSERT INTO admin_notifications (type, title, message, severity) VALUES (?, ?, ?, ?)",
-                 (type_, title, message, severity))
-    conn.commit()
-
-# ── Pydantic Models ──
-class SignupReq(BaseModel):
-    username: str
-    name: str
-    email: str
-    password: str
-    age: str = ""
-    nature: str = ""
-    agent_name: str = "BapX"
-    bio: str = ""
-
-class LoginReq(BaseModel):
-    email: str
-    password: str
-
-class ProfileUpdate(BaseModel):
-    name: Optional[str] = None
-    age: Optional[str] = None
-    nature: Optional[str] = None
-    agent_name: Optional[str] = None
-    bio: Optional[str] = None
-
-class ApiKeyUpdate(BaseModel):
-    provider: Optional[str] = None
-    key: Optional[str] = None
-    model: Optional[str] = None
-
-class OAuthStartReq(BaseModel):
-    provider: str
-
-class OAuthPollReq(BaseModel):
-    flow_id: str
-
-class SkillsUpdate(BaseModel):
-    skills: list[str]
-
-class ChatSend(BaseModel):
-    message: str
-    session_id: Optional[str] = None
-
-class TTSReq(BaseModel):
-    text: str
-
-class MemorySave(BaseModel):
-    key: str
-    value: str
-    session_id: str = ""
-
-class AgentRunReq(BaseModel):
-    message: str
-    session_id: Optional[str] = None
-
-class SandboxStartReq(BaseModel):
-    pass
-
-class SandboxExecReq(BaseModel):
-    command: str
-    language: str = "bash"
-
-# ── Admin Models ──
-class AdminLoginReq(BaseModel):
-    email: str
-    password: str
-
-class ConfigUpdateReq(BaseModel):
-    key: str
-    value: str
-
-class AdminNotificationCreate(BaseModel):
-    type: str
-    title: str
-    message: str
-    severity: str = "info"
-
-class AdminActionResp(BaseModel):
-    status: str
-    message: str = ""
-
-# ── ALL providers (no hardcoded models — fetched LIVE after auth) ──
-ALL_PROVIDERS = {
-    # API Key providers
-    "openai":     {"name": "OpenAI",          "auth": "api_key", "base_url": "https://api.openai.com/v1"},
-    "anthropic":  {"name": "Anthropic",       "auth": "api_key", "base_url": "https://api.anthropic.com"},
-    "google":     {"name": "Google Gemini",   "auth": "api_key", "base_url": "https://generativelanguage.googleapis.com/v1beta"},
-    "deepseek":   {"name": "DeepSeek",        "auth": "api_key", "base_url": "https://api.deepseek.com/v1"},
-    "openrouter": {"name": "OpenRouter",      "auth": "api_key", "base_url": "https://openrouter.ai/api/v1"},
-    "xai":        {"name": "xAI Grok",        "auth": "api_key", "base_url": "https://api.x.ai/v1"},
-    "groq":       {"name": "Groq",            "auth": "api_key", "base_url": "https://api.groq.com/openai/v1"},
-    "mistral":    {"name": "Mistral",         "auth": "api_key", "base_url": "https://api.mistral.ai/v1"},
-    "together":   {"name": "Together AI",     "auth": "api_key", "base_url": "https://api.together.xyz/v1"},
-    "cohere":     {"name": "Cohere",          "auth": "api_key", "base_url": "https://api.cohere.com/v1"},
-    "perplexity": {"name": "Perplexity",      "auth": "api_key", "base_url": "https://api.perplexity.ai"},
-    "huggingface":{"name": "Hugging Face",    "auth": "api_key", "base_url": "https://api-inference.huggingface.co/v1"},
-    "minimax":    {"name": "MiniMax",         "auth": "api_key", "base_url": "https://api.minimax.chat/v1"},
-    "kimi":       {"name": "Kimi Moonshot",   "auth": "api_key", "base_url": "https://api.moonshot.cn/v1"},
-    "xiaomi":     {"name": "Xiaomi MiMo",     "auth": "api_key", "base_url": "https://api.mimo.one/v1"},
-    "zai":        {"name": "Z.AI GLM",        "auth": "api_key", "base_url": "https://open.bigmodel.cn/api/paas/v4"},
-    "dashscope":  {"name": "Alibaba DashScope","auth": "api_key", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
-    "stepfun":    {"name": "StepFun",         "auth": "api_key", "base_url": "https://api.stepfun.com/v1"},
-    # OAuth providers — models fetched live after auth
-    "openai-oauth":    {"name": "ChatGPT (OpenAI)",    "auth": "oauth", "oauth_type": "openai_real"},
-    "anthropic-oauth": {"name": "Claude (Anthropic)",  "auth": "oauth", "oauth_type": "anthropic_real"},
-    "google-oauth":    {"name": "Google (OAuth)",      "auth": "oauth", "oauth_type": "google_real"},
-    "nous-oauth":      {"name": "Nous Portal",         "auth": "oauth", "oauth_type": "nous"},
-    "qwen-oauth":      {"name": "Qwen (Alibaba)",      "auth": "oauth", "oauth_type": "qwen"},
-    # Copilot / Token-based
-    "github-copilot":  {"name": "GitHub Copilot",      "auth": "copilot", "oauth_type": "copilot"},
-}
-
-OAUTH_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "oauth"}
-API_KEY_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "api_key"}
-COPILOT_PROVIDERS = {k: v for k, v in ALL_PROVIDERS.items() if v["auth"] == "copilot"}
-
-# ── Device Flow OAuth configurations ──
-# Real provider OAuth: Users authenticate with THEIR OWN ChatGPT/Claude/Google accounts
-# The proxy endpoint (v1/chat/completions) routes requests using the user's stored token
-OAUTH_CONFIGS = {
-    "openai_real": {
-        "client_id": "bapx-device-flow",
-        "scopes": ["openai_api", "models.read", "models.write"],
-        "device_url": "https://auth.openai.com/oauth/device/code",
-        "token_url": "https://auth.openai.com/oauth/token",
-        "auth_url": "https://auth.openai.com/oauth/device",
-        "headers": {"Accept": "application/json"},
-        "proxies_to": {"base_url": "https://api.openai.com/v1", "provider": "openai"},
-    },
-    "anthropic_real": {
-        "client_id": "bapx-device-flow",
-        "scopes": ["anthropic_api", "models.read"],
-        "device_url": "https://auth.anthropic.com/oauth/device/code",
-        "token_url": "https://auth.anthropic.com/oauth/token",
-        "auth_url": "https://auth.anthropic.com/oauth/device",
-        "headers": {"Accept": "application/json"},
-        "proxies_to": {"base_url": "https://api.anthropic.com/v1", "provider": "anthropic"},
-    },
-    "google_real": {
-        "client_id": "bapx-device-flow",
-        "scopes": ["https://www.googleapis.com/auth/generative-language"],
-        "device_url": "https://oauth2.googleapis.com/device/code",
-        "token_url": "https://oauth2.googleapis.com/token",
-        "auth_url": "https://oauth2.googleapis.com/oauth/device",
-        "headers": {"Accept": "application/json"},
-        "proxies_to": {"base_url": "https://generativelanguage.googleapis.com/v1beta", "provider": "google"},
-    },
-    "nous": {
-        "client_id": "bapx-device-flow",
-        "scopes": ["openai_api"],
-        "device_url": "https://nousresearch.com/device/code",
-        "token_url": "https://nousresearch.com/device/token",
-        "auth_url": "https://nousresearch.com/device",
-        "headers": {"Accept": "application/json"},
-    },
-    "qwen": {
-        "client_id": "bapx-device-flow",
-        "scopes": ["qwen_api"],
-        "device_url": "https://dashscope.aliyuncs.com/device/code",
-        "token_url": "https://dashscope.aliyuncs.com/device/token",
-        "auth_url": "https://dashscope.aliyuncs.com/device",
-        "headers": {"Accept": "application/json"},
-    },
-    "copilot": {
-        "client_id": "bapx-device-flow",
-        "scopes": ["copilot_api"],
-        "device_url": "https://github.com/login/device/code",
-        "token_url": "https://github.com/login/oauth/access_token",
-        "auth_url": "https://github.com/login/device",
-        "headers": {"Accept": "application/json"},
-    },
-}
-
-# ── Skills loader ──
-# Only load bapX-specific skills
-def load_default_skills() -> list[dict]:
-    """Load all SKILL.md files from bapX skills directory only."""
-    skills = []
-    if SKILLS_DIR.exists():
-        for path in SKILLS_DIR.rglob("SKILL.md"):
-            try:
-                content = path.read_text(encoding="utf-8", errors="replace")
-                name = path.parent.name
-                desc = ""
-                category = path.parent.parent.name if path.parent.parent != SKILLS_DIR else ""
-                if content.startswith("---"):
-                    parts = content.split("---", 2)
-                    if len(parts) >= 3:
-                        fm = parts[1]
-                        for line in fm.split("\n"):
-                            if line.startswith("description:"):
-                                desc = line.split(":", 1)[1].strip().strip('"').strip("'")
-                                break
-                if not any(s["name"] == name for s in skills):
-                    skills.append({
-                        "name": name,
-                        "description": desc or "No description",
-                        "category": category if category and category != "SKILL.md" else "general",
-                        "path": str(path),
-                    })
-            except Exception:
-                continue
-    return skills
-
-DEFAULT_SKILLS_CACHE = None
-def get_default_skills() -> list[dict]:
-    global DEFAULT_SKILLS_CACHE
-    if DEFAULT_SKILLS_CACHE is None:
-        DEFAULT_SKILLS_CACHE = load_default_skills()
-    return DEFAULT_SKILLS_CACHE
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            s.starttls()
+            if SMTP_USER:
+                s.login(SMTP_USER, SMTP_PASS)
+            s.send_message(msg)
+    except Exception as e:
+        print(f"[Email] Send failed: {e}")
 
 # ── Routes ──
+
 # ── Auth ──
 @app.post("/api/signup")
-@limiter.limit("10/minute")
+@limiter.limit("5/minute")
 async def signup(req: SignupReq, request: Request):
     if len(req.password) < 8:
         raise HTTPException(400, "Password must be 8+ characters")
@@ -396,124 +276,93 @@ async def signup(req: SignupReq, request: Request):
         raise HTTPException(409, "Username taken")
     if conn.execute("SELECT id FROM users WHERE email = ?", (req.email,)).fetchone():
         raise HTTPException(409, "Email registered")
+
     uid = uuid.uuid4().hex
-    agent_name = req.agent_name or "BapX"
-    soul = f"""# SOUL.md — {req.name}'s Agent
-
-## Who You Are
-**Name:** {req.name} | **Username:** {req.username}
-{('**Age:** ' + req.age) if req.age else ''}
-{('**Nature:** ' + req.nature) if req.nature else ''}
-{('**Bio:** ' + req.bio) if req.bio else ''}
-
-## Your Agent: {agent_name}
-Your agent works for you autonomously — executing tasks, managing memory, building skills.
-
-## Capabilities
-- Full model access via API key or OAuth login
-- All built-in bapX skills
-- Isolated sandbox
-"""
-    conn.execute("""INSERT INTO users
-        (id, username, name, email, password_hash, age, nature, agent_name, bio, soul_md)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+    conn.execute("INSERT INTO users (id, username, name, email, password_hash, age, bio) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (uid, req.username, req.name, req.email,
-         hashlib.sha256(req.password.encode()).hexdigest(), req.age, req.nature,
-         agent_name, req.bio, soul))
+         hashlib.sha256(req.password.encode()).hexdigest(), req.age, req.bio))
     conn.commit()
-    # Create OpenSandbox sandbox for new user
-    sandbox_id = ""
-    try:
-        sandbox_conn_cfg = type("ConnectionConfig", (), {
-            "get_base_url": lambda self: "http://127.0.0.1:8080",
-            "get_api_key": lambda self: "",
-        })()
-        sb = await Sandbox.create(
-            "ubuntu",
-            connection_config=sandbox_conn_cfg,
-            resource={"cpu": "500m", "memory": "1Gi"},
-            metadata={"user_id": uid, "name": req.username},
-            timeout=timedelta(hours=1),
-            skip_health_check=True,
-        )
-        sandbox_id = getattr(sb, "sandbox_id", getattr(sb, "id", ""))
-        if sandbox_id:
-            conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (sandbox_id, uid))
-            conn.execute("INSERT INTO sandboxes (id, user_id, sandbox_id, status) VALUES (?, ?, ?, 'running')",
-                         (uuid.uuid4().hex, uid, sandbox_id))
-            conn.commit()
-    except Exception as e:
-        print(f"[Sandbox] Signup sandbox creation skipped: {e}")
-    return {"token": make_token(uid), "user": {
-        "id": uid, "username": req.username, "name": req.name,
-        "email": req.email, "provider": "openai", "model": ""
-    }}
+
+    # Send verification email (GitHub-style)
+    code = gen_code()
+    cid = uuid.uuid4().hex
+    conn.execute("INSERT INTO verification_codes (id, user_id, email, code, purpose, expires_at) VALUES (?, ?, ?, ?, 'email_verify', ?)",
+        (cid, uid, req.email, code, (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()))
+    conn.commit()
+    send_email(req.email,
+        "[bapX] Verify your email address",
+        f"Hi {req.name},\n\nYour bapX verification code:\n\n  {code}\n\nEnter this code to verify your email. This code expires in 24 hours.\n\nThanks,\nbapX Team")
+
+    return {"token": make_token(uid), "user": {"id": uid, "username": req.username, "name": req.name, "email": req.email}}
 
 @app.post("/api/login")
-@limiter.limit("20/minute")
+@limiter.limit("10/minute")
 def login(req: LoginReq, request: Request):
     user = conn.execute("SELECT * FROM users WHERE email = ?", (req.email,)).fetchone()
     if not user or not hashlib.sha256(req.password.encode()).hexdigest() == user["password_hash"]:
-        raise HTTPException(401, "Invalid credentials")
+        raise HTTPException(401, "Invalid email or password")
     return {"token": make_token(user["id"]), "user": dict(user)}
 
-# ── Providers ──
-@app.get("/api/providers")
-def list_providers():
-    """Return all providers with their auth methods."""
-    api_key_provs = []
-    oauth_provs = []
-    copilot_provs = []
-    for pid, p in ALL_PROVIDERS.items():
-        entry = {
-            "id": pid,
-            "name": p["name"],
-            "auth": p["auth"],
-            "oauth_type": p.get("oauth_type", None),
-        }
-        if p["auth"] == "oauth":
-            oauth_provs.append(entry)
-        elif p["auth"] == "copilot":
-            copilot_provs.append(entry)
-        else:
-            api_key_provs.append(entry)
-    return {
-        "api_key": api_key_provs,
-        "oauth": oauth_provs,
-        "copilot": copilot_provs,
-    }
+@app.post("/api/auth/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(req: ForgotPasswordReq, request: Request):
+    user = conn.execute("SELECT id, name, email FROM users WHERE email = ?", (req.email,)).fetchone()
+    if not user:
+        return {"status": "ok"}  # Don't reveal if email exists
+    code = gen_code()
+    cid = uuid.uuid4().hex
+    conn.execute("INSERT INTO verification_codes (id, user_id, email, code, purpose, expires_at) VALUES (?, ?, ?, ?, 'password_reset', ?)",
+        (cid, user["id"], req.email, code, (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()))
+    conn.commit()
+    send_email(req.email,
+        "[bapX] Reset your password",
+        f"Hi {user['name']},\n\nYour bapX password reset code:\n\n  {code}\n\nEnter this code to reset your password. This code expires in 1 hour.\n\nIf you didn't request this, you can safely ignore this email.\n\nThanks,\nbapX Team")
+    return {"status": "ok"}
 
-# ── User Settings ──
+@app.post("/api/auth/reset-password")
+@limiter.limit("5/minute")
+def reset_password(req: ResetPasswordReq, request: Request):
+    if len(req.password) < 8:
+        raise HTTPException(400, "Password must be 8+ characters")
+    row = conn.execute("SELECT * FROM verification_codes WHERE email = ? AND code = ? AND purpose = 'password_reset' AND used = 0 AND expires_at > datetime('now')",
+        (req.email, req.code)).fetchone()
+    if not row:
+        raise HTTPException(400, "Invalid or expired code")
+    conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
+    conn.execute("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE email = ?",
+        (hashlib.sha256(req.password.encode()).hexdigest(), req.email))
+    conn.commit()
+    return {"status": "ok", "message": "Password reset successfully"}
+
+@app.post("/api/auth/verify-email")
+@limiter.limit("5/minute")
+def verify_email(req: VerifyEmailReq, request: Request):
+    row = conn.execute("SELECT * FROM verification_codes WHERE email = ? AND code = ? AND purpose = 'email_verify' AND used = 0 AND expires_at > datetime('now')",
+        (req.email, req.code)).fetchone()
+    if not row:
+        raise HTTPException(400, "Invalid or expired code")
+    conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
+    conn.execute("UPDATE users SET email_verified = 1 WHERE id = ?", (row["user_id"],))
+    conn.commit()
+    return {"status": "ok", "message": "Email verified"}
+
+# ── User Profile ──
 @app.get("/api/user/profile")
 async def user_profile(user: dict = Depends(get_current_user)):
-    try:
-        skills_enabled = json.loads(user["skills_enabled"]) if user["skills_enabled"] else []
-    except Exception:
-        skills_enabled = []
-    # Check sandbox status
-    sandbox_status = await get_sandbox_status(user["id"])
-    return {
-        "id": user["id"], "username": user["username"],
-        "name": user["name"], "email": user["email"],
-        "age": user["age"], "nature": user["nature"],
-        "agent_name": user["agent_name"], "bio": user["bio"],
-        "soul_md": user["soul_md"],
-        "skills_enabled": skills_enabled,
+    sandbox_status = await get_sandbox_status(user["id"]) if user.get("sandbox_id") else {"status": "none"}
+    return {"id": user["id"], "username": user["username"], "name": user["name"],
+        "email": user["email"], "age": user["age"], "bio": user["bio"],
+        "email_verified": user["email_verified"], "is_admin": user["is_admin"],
         "sandbox_status": sandbox_status.get("status", "none"),
-        # Credentials stored in sandbox ~/.bapx/ — not in DB
-        "has_api_key": False,
-        "connected_providers": [],
-    }
+        "stripe_status": user.get("stripe_status", "none")}
 
 @app.put("/api/user/profile")
 def update_profile(req: ProfileUpdate, user: dict = Depends(get_current_user)):
-    updates = []
-    vals = []
-    for field in ("name", "age", "nature", "agent_name", "bio"):
-        val = getattr(req, field, None)
-        if val is not None:
-            updates.append(f"{field} = ?")
-            vals.append(val)
+    updates, vals = [], []
+    for f in ("name", "age", "bio"):
+        v = getattr(req, f, None)
+        if v is not None:
+            updates.append(f"{f} = ?"); vals.append(v)
     if not updates:
         raise HTTPException(400, "Nothing to update")
     vals.append(user["id"])
@@ -521,514 +370,70 @@ def update_profile(req: ProfileUpdate, user: dict = Depends(get_current_user)):
     conn.commit()
     return {"status": "ok"}
 
-# ── API Key Auth ──
-@app.post("/api/providers/fetch-models")
-async def fetch_models_from_provider(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
-    """Fetch available models from a live provider API, given a valid API key."""
-    provider = req.provider or user.get("provider", "openai")
-    api_key = req.key or user.get("api_key", "")
-    if not api_key:
-        raise HTTPException(400, "No API key provided")
-    prov_info = ALL_PROVIDERS.get(provider, {})
-    base_url = prov_info.get("base_url", "")
-    if not base_url:
-        raise HTTPException(400, f"Unknown base URL for provider: {provider}")
-
-    models_url = base_url.rstrip("/")
-    if provider == "anthropic":
-        models_url += "/v1/models"
-        headers = {"x-api-key": api_key, "Content-Type": "application/json"}
-    elif provider == "google":
-        models_url += "/models"
-        headers = {"Content-Type": "application/json"}
-    elif provider == "perplexity":
-        for suffix in ["/models", "/v1/models"]:
-            try:
-                async with httpx.AsyncClient(timeout=10) as c:
-                    r = await c.get(base_url.rstrip("/") + suffix, headers={"Authorization": f"Bearer {api_key}"})
-                    if r.status_code < 400:
-                        models_url = base_url.rstrip("/") + suffix
-                        break
-            except: pass
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    else:
-        if not models_url.endswith("/v1"):
-            models_url += "/v1"
-        models_url += "/models"
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-
-    # For OpenRouter, add required headers
-    if provider == "openrouter":
-        headers["HTTP-Referer"] = "https://bapx.in"
-        headers["X-Title"] = "bapX"
-
+# ── Sandbox File Bridge (write config/auth to sandbox ~/.bapx/) ──
+@app.post("/api/sandbox/write-file")
+async def sandbox_write_file(req: Request, user: dict = Depends(get_current_user)):
+    """Write a file to user's sandbox at ~/.bapx/<path>"""
+    body = await req.json()
+    filepath = body.get("path", "")
+    content = body.get("content", "")
+    if not filepath or not content:
+        raise HTTPException(400, "path and content required")
+    safe_path = filepath.replace("..", "").lstrip("/")
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(models_url, headers=headers)
-            if resp.status_code >= 400:
-                # Fallback to hardcoded models
-                return {"models": prov_info.get("models", []), "source": "fallback"}
-            data = resp.json()
-    except Exception:
-        return {"models": prov_info.get("models", []), "source": "fallback"}
-
-    # Parse models from response
-    model_list = []
-    if "data" in data and isinstance(data["data"], list):
-        for m in data["data"]:
-            mid = m.get("id") or m.get("name") or ""
-            if mid:
-                model_list.append(mid)
-    elif "models" in data and isinstance(data["models"], list):
-        for m in data["models"]:
-            mid = m.get("id") or m.get("name") or ""
-            if mid:
-                model_list.append(mid)
-
-    if not model_list:
-        model_list = prov_info.get("models", [])
-
-    # Cache the fetched models
-    conn.execute("UPDATE users SET cached_models = ? WHERE id = ?", (json.dumps(model_list), user["id"]))
-    conn.commit()
-
-    return {"models": model_list, "source": "live"}
-
-@app.post("/api/user/api-key")
-async def update_api_key(req: ApiKeyUpdate, user: dict = Depends(get_current_user)):
-    """Save API key to user's sandbox ~/.bapx/config.toml — NOT in bapX DB."""
-    if not req.key or req.key == "":
-        raise HTTPException(400, "API key required")
-    if len(req.key) < 8:
-        raise HTTPException(400, "Key must be 8+ chars")
-    if not req.provider:
-        raise HTTPException(400, "Provider required")
-    if req.provider not in ALL_PROVIDERS:
-        raise HTTPException(400, f"Unknown provider: {req.provider}")
-
-    # Build config.toml content for Codex inside sandbox
-    prov_info = ALL_PROVIDERS[req.provider]
-    base_url = prov_info.get("base_url", "")
-    model_name = req.model or ""
-
-    # The API key goes to sandbox file, NOT bapX database
-    config_content = f'''# bapX config — written by bapX backend
-[model_providers]
-"{req.provider}" = {{ model = "{model_name}", base_url = "{base_url}" }}
-
-[auth]
-api_key = "{req.key}"
-'''
-    # Write to sandbox
-    try:
-        sb = await start_sandbox(user["id"], user["username"])
+        sb = await get_sandbox_status(user["id"])
         if not sb or not sb.get("sandbox_id"):
-            raise HTTPException(500, "No sandbox available")
-        await exec_in_sandbox(user["id"],
-            f"mkdir -p ~/.bapx && cat > ~/.bapx/config.toml << 'EOF'\n{config_content}\nEOF")
+            sb = await start_sandbox(user["id"], user["username"])
+            if sb and sb.get("sandbox_id"):
+                conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (sb["sandbox_id"], user["id"]))
+                conn.commit()
+        result = await exec_in_sandbox(user["id"],
+            f"mkdir -p ~/.bapx/$(dirname {safe_path}) && cat > ~/.bapx/{safe_path} << 'BAPXEOF'\n{content}\nBAPXEOF")
+        return {"status": "ok", "path": f"~/.bapx/{safe_path}"}
     except Exception as e:
-        raise HTTPException(500, f"Failed to write config to sandbox: {str(e)[:200]}")
+        raise HTTPException(500, f"Failed: {str(e)[:200]}")
 
-    return {"status": "ok", "message": "Key saved to sandbox"}
-
-# ── OAuth Device Flow ──
-# Flow: frontend calls start → gets code+url → opens popup on USER'S browser → polls → saves to sandbox
-
-@app.post("/api/auth/oauth/start")
-async def oauth_start(req: OAuthStartReq, user: dict = Depends(get_current_user)):
-    """Start OAuth device flow. Returns code + URL — frontend opens popup on user's browser."""
-    if req.provider not in ALL_PROVIDERS:
-        raise HTTPException(400, f"Unknown provider: {req.provider}")
-    provider_info = ALL_PROVIDERS[req.provider]
-    oauth_type = provider_info.get("oauth_type")
-    if not oauth_type or oauth_type not in OAUTH_CONFIGS:
-        raise HTTPException(400, f"No OAuth config for {req.provider}")
-
-    import random
-    cfg = OAUTH_CONFIGS[oauth_type]
-
-    # Get sandbox device ID — generated when sandbox is created, stored in sandbox
-    device_id = uuid.uuid4().hex[:12]
+@app.get("/api/sandbox/read-file")
+async def sandbox_read_file(path: str = "", user: dict = Depends(get_current_user)):
+    """Read a file from user's sandbox at ~/.bapx/<path>"""
+    if not path:
+        raise HTTPException(400, "path required")
+    safe_path = path.replace("..", "").lstrip("/")
     try:
-        sb = await start_sandbox(user["id"], user["username"])
-        if sb and sb.get("sandbox_id"):
-            # Store device_id in sandbox for future reference
-            await exec_in_sandbox(user["id"],
-                f"mkdir -p ~/.bapx && echo '{device_id}' > ~/.bapx/device_id")
-    except Exception:
-        pass
-
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                cfg["device_url"],
-                json={"client_id": cfg["client_id"], "scope": " ".join(cfg["scopes"])},
-                headers=cfg["headers"],
-                timeout=30,
-            )
-            data = resp.json()
+        result = await exec_in_sandbox(user["id"], f"cat ~/.bapx/{safe_path} 2>/dev/null || echo 'NOT_FOUND'")
+        output = result.get("output", "").strip()
+        if output == "NOT_FOUND":
+            raise HTTPException(404, "File not found")
+        return {"content": output, "path": f"~/.bapx/{safe_path}"}
+    except HTTPException:
+        raise
     except Exception as e:
-        data = {}
-
-    # Generate code always — fallback if provider API fails
-    server_user_code = data.get("user_code", "")
-    verification_uri = data.get("verification_uri", cfg["auth_url"])
-    if not server_user_code or len(server_user_code) < 4:
-        server_user_code = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=8))
-        server_user_code = server_user_code[:4] + "-" + server_user_code[4:]
-
-    flow_id = uuid.uuid4().hex
-    # Store flow info temporarily (cleaned up after completion)
-    conn.execute("INSERT OR REPLACE INTO oauth_flows (id, user_id, provider, device_code, user_code, verification_uri, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
-                 (flow_id, user["id"], req.provider, data.get("device_code", "sim_" + uuid.uuid4().hex),
-                  server_user_code, verification_uri,
-                  (datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 900))).isoformat()))
-    conn.commit()
-
-    return {
-        "flow_id": flow_id,
-        "user_code": server_user_code,
-        "verification_uri": verification_uri,
-        "device_id": device_id,
-        "provider": req.provider,
-        "provider_name": provider_info["name"],
-    }
-
-@app.post("/api/auth/oauth/token-exchange")
-async def oauth_token_exchange(req: OAuthPollReq, user: dict = Depends(get_current_user)):
-    """Exchange OAuth device code for access token. Called by frontend after user authorizes in browser popup."""
-    flow = conn.execute("SELECT * FROM oauth_flows WHERE id = ? AND user_id = ?",
-                        (req.flow_id, user["id"])).fetchone()
-    if not flow:
-        raise HTTPException(404, "Flow not found")
-
-    cfg = OAUTH_CONFIGS.get(ALL_PROVIDERS[flow["provider"]].get("oauth_type", ""))
-    if not cfg:
-        raise HTTPException(400, "No OAuth config")
-
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                cfg["token_url"],
-                json={
-                    "client_id": cfg["client_id"],
-                    "device_code": flow["device_code"],
-                    "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-                },
-                headers=cfg["headers"],
-                timeout=30,
-            )
-            data = resp.json()
-    except Exception:
-        return {"status": "pending"}
-
-    if "access_token" in data:
-        # Write token to sandbox ~/.bapx/auth.json — NOT in bapX DB
-        try:
-            auth_data = json.dumps({
-                "provider": flow["provider"],
-                "access_token": data["access_token"],
-                "refresh_token": data.get("refresh_token", ""),
-                "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))).isoformat(),
-            })
-            await exec_in_sandbox(user["id"],
-                f"mkdir -p ~/.bapx && cat > ~/.bapx/auth.json << 'EOFAUTH'\n{auth_data}\nEOFAUTH")
-        except Exception as e:
-            pass
-
-        conn.execute("UPDATE oauth_flows SET status = 'completed' WHERE id = ?", (req.flow_id,))
-        conn.commit()
-        return {"status": "completed", "provider": flow["provider"]}
-
-    if "error" in data:
-        err = data["error"]
-        if err in ("authorization_pending", "slow_down"):
-            return {"status": "pending"}
-        if err in ("expired_token", "access_denied"):
-            conn.execute("UPDATE oauth_flows SET status = ? WHERE id = ?", (err, req.flow_id))
-            conn.commit()
-            return {"status": "failed", "error": err}
-
-    return {"status": "pending"}
-
-# ── Skills ──
-@app.get("/api/skills")
-def list_skills():
-    """Return ALL default skills (user-created)."""
-    return {"skills": get_default_skills()}
-
-@app.get("/api/user/skills")
-def user_skills(user: dict = Depends(get_current_user)):
-    """Return user's enabled skills."""
-    try:
-        enabled = json.loads(user["skills_enabled"]) if user["skills_enabled"] else []
-    except Exception:
-        enabled = []
-    all_skills = get_default_skills()
-    return {"enabled": enabled, "available": all_skills}
-
-@app.post("/api/user/skills")
-def save_user_skills(req: SkillsUpdate, user: dict = Depends(get_current_user)):
-    """Save user's enabled skill names."""
-    all_names = {s["name"] for s in get_default_skills()}
-    valid = [s for s in req.skills if s in all_names]
-    conn.execute("UPDATE users SET skills_enabled = ?, updated_at = datetime('now') WHERE id = ?",
-                 (json.dumps(valid), user["id"]))
-    conn.commit()
-    return {"status": "ok", "enabled": valid}
-
-# ── Chat ──
-@app.post("/api/chat/send")
-async def chat_send(req: ChatSend, user: dict = Depends(get_current_user)):
-    """Route message through agent orchestrator with sandbox context."""
-    provider = user.get("provider", "openai")
-    model = user.get("model", "gpt-4o")
-
-    # Check/setup sandbox for this user
-    sandbox_id = user.get("sandbox_id", "")
-    if not sandbox_id:
-        # Check in-memory registry
-        from sandbox_manager import get_sandbox_status
-        sb_status = await get_sandbox_status(user["id"])
-        if sb_status.get("sandbox_id"):
-            sandbox_id = sb_status["sandbox_id"]
-            conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (sandbox_id, user["id"]))
-            conn.commit()
-        else:
-            # Try creating a sandbox
-            try:
-                sb_result = await start_sandbox(user["id"], user["username"])
-                if "sandbox_id" in sb_result:
-                    sandbox_id = sb_result["sandbox_id"]
-                    conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (sandbox_id, user["id"]))
-                    conn.commit()
-            except Exception:
-                pass
-
-    # Save message to session
-    sid = req.session_id or uuid.uuid4().hex
-    if not req.session_id:
-        conn.execute("INSERT INTO sessions (id, user_id) VALUES (?, ?)", (sid, user["id"]))
-
-    session = conn.execute("SELECT messages FROM sessions WHERE id = ? AND user_id = ?",
-                          (sid, user["id"])).fetchone()
-    messages = json.loads(session["messages"]) if session else []
-    messages.append({"role": "user", "content": req.message})
-    conn.execute("UPDATE sessions SET messages = ? WHERE id = ?", (json.dumps(messages), sid))
-    conn.commit()
-
-    # Get auth credential for the orchestrator
-    api_key = user.get("api_key", "")
-    try:
-        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
-    except Exception:
-        oauth_tokens = {}
-    credential = api_key or oauth_tokens.get(provider, "")
-    if credential:
-        os.environ["OPENAI_API_KEY"] = credential
-    if provider in ("anthropic", "deepseek", "openrouter", "groq", "mistral"):
-        prov_urls = {
-            "anthropic": "https://api.anthropic.com/v1",
-            "deepseek": "https://api.deepseek.com/v1",
-            "openrouter": "https://openrouter.ai/api/v1",
-            "groq": "https://api.groq.com/openai/v1",
-            "mistral": "https://api.mistral.ai/v1",
-        }
-        os.environ["OPENAI_BASE_URL"] = prov_urls.get(provider, "https://api.openai.com/v1")
-
-    async def stream():
-        full_response = ""
-        async for chunk in route_user_message(
-            req.message,
-            user_id=user["id"],
-            sandbox_id=sandbox_id,
-            conversation_history=messages[:-1],  # Exclude current message
-        ):
-            yield chunk
-            try:
-                prefix = "data: "
-                if chunk.startswith(prefix):
-                    data = json.loads(chunk[len(prefix):])
-                    if "text" in data:
-                        full_response += data["text"]
-                    elif "final" in data:
-                        full_response = data["final"]
-            except (json.JSONDecodeError, IndexError):
-                pass
-
-        # Save response
-        if full_response:
-            messages.append({"role": "assistant", "content": full_response})
-            conn.execute("UPDATE sessions SET messages = ? WHERE id = ?",
-                        (json.dumps(messages), sid))
-            conn.commit()
-
-    return StreamingResponse(stream(), media_type="text/event-stream",
-        headers={"X-Session-Id": sid})
-
-# ── Agent Runtime (OpenAI Agents SDK) ──
-@app.post("/api/agent/run")
-async def agent_run(req: AgentRunReq, user: dict = Depends(get_current_user)):
-    """Run user message through OpenAI Agents SDK with full tool access."""
-    # Load session history
-    sid = req.session_id or uuid.uuid4().hex
-    if not req.session_id:
-        conn.execute("INSERT INTO sessions (id, user_id) VALUES (?, ?)", (sid, user["id"]))
-        conn.commit()
-
-    session = conn.execute("SELECT messages FROM sessions WHERE id = ? AND user_id = ?",
-                          (sid, user["id"])).fetchone()
-    messages = json.loads(session["messages"]) if session else []
-    messages.append({"role": "user", "content": req.message})
-
-    # Load user's enabled skills
-    try:
-        enabled_skill_names = json.loads(user["skills_enabled"]) if user["skills_enabled"] else []
-    except Exception:
-        enabled_skill_names = []
-    all_skills = get_default_skills()
-    enabled_skills = [s for s in all_skills if s["name"] in enabled_skill_names]
-
-    async def stream():
-        full_response = ""
-        async for chunk in stream_agent_response(user, messages, enabled_skills):
-            yield chunk
-            try:
-                prefix = "data: "
-                if chunk.startswith(prefix):
-                    data = json.loads(chunk[len(prefix):])
-                    if "text" in data:
-                        full_response += data["text"]
-            except (json.JSONDecodeError, IndexError):
-                pass
-
-        # Save response
-        if full_response:
-            messages.append({"role": "assistant", "content": full_response})
-            conn.execute("UPDATE sessions SET messages = ? WHERE id = ?",
-                        (json.dumps(messages), sid))
-            conn.commit()
-
-    return StreamingResponse(stream(), media_type="text/event-stream",
-        headers={"X-Session-Id": sid})
-
-# ── Sessions ──
-@app.get("/api/sessions")
-def list_sessions(user: dict = Depends(get_current_user)):
-    rows = conn.execute(
-        "SELECT id, title, created_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
-        (user["id"],)).fetchall()
-    return {"sessions": [dict(r) for r in rows]}
-
-@app.delete("/api/sessions/{session_id}")
-def delete_session(session_id: str, user: dict = Depends(get_current_user)):
-    conn.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["id"]))
-    conn.commit()
-    return {"status": "deleted"}
-
-@app.get("/api/sessions/{session_id}")
-def get_session(session_id: str, user: dict = Depends(get_current_user)):
-    session = conn.execute("SELECT * FROM sessions WHERE id = ? AND user_id = ?",
-                          (session_id, user["id"])).fetchone()
-    if not session:
-        raise HTTPException(404, "Session not found")
-    return dict(session)
-
-# ── TTS ──
-TTS_ENGINE = None
-
-def get_tts_engine():
-    global TTS_ENGINE
-    if TTS_ENGINE is None:
-        from kittentts import KittenTTS
-        TTS_ENGINE = KittenTTS()
-    return TTS_ENGINE
-
-@app.post("/api/tts")
-async def text_to_speech(req: TTSReq):
-    """Generate TTS audio from text using KittenTTS."""
-    if not req.text or not req.text.strip():
-        raise HTTPException(400, "Text is required")
-    text = req.text.strip()[:2000]  # Cap length
-    try:
-        tts = get_tts_engine()
-        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        tmp_path = tmp.name
-        tmp.close()
-        tts.generate_to_file(text, tmp_path)
-        # Schedule cleanup after response
-        background_tasks = BackgroundTasks()
-        background_tasks.add_task(os.unlink, tmp_path)
-        return FileResponse(tmp_path, media_type="audio/wav", filename="tts.wav",
-                            headers={"Content-Disposition": "inline"},
-                            background=background_tasks)
-    except Exception as e:
-        raise HTTPException(500, f"TTS generation failed: {str(e)}")
-
-# ── Cross-session Memory ──
-@app.post("/api/memory/save")
-def memory_save(req: MemorySave, user: dict = Depends(get_current_user)):
-    """Save a key-value memory for cross-session recall."""
-    if not req.key or not req.key.strip():
-        raise HTTPException(400, "Key is required")
-    if not req.value or not req.value.strip():
-        raise HTTPException(400, "Value is required")
-    conn.execute(
-        "INSERT INTO memories (user_id, session_id, key, value) VALUES (?, ?, ?, ?)",
-        (user["id"], req.session_id, req.key.strip(), req.value.strip()),
-    )
-    conn.commit()
-    return {"status": "ok"}
-
-@app.get("/api/memory")
-def memory_get(session_id: str = "", user: dict = Depends(get_current_user)):
-    """Get stored memories, optionally filtered by session_id."""
-    if session_id:
-        rows = conn.execute(
-            "SELECT key, value, created_at FROM memories WHERE user_id = ? AND session_id = ? ORDER BY created_at DESC",
-            (user["id"], session_id),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT key, value, session_id, created_at FROM memories WHERE user_id = ? ORDER BY created_at DESC LIMIT 100",
-            (user["id"],),
-        ).fetchall()
-    return {"memories": [dict(r) for r in rows]}
+        raise HTTPException(500, str(e)[:200])
 
 # ── Sandbox ──
 @app.post("/api/sandbox/start")
-async def sandbox_start(user: dict = Depends(get_current_user)):
-    """Start a sandbox for the current user."""
+async def sb_start(user: dict = Depends(get_current_user)):
     result = await start_sandbox(user["id"], user["username"])
-    if "error" in result:
-        raise HTTPException(400, result["error"])
+    if result and result.get("sandbox_id"):
+        conn.execute("UPDATE users SET sandbox_id = ? WHERE id = ?", (result["sandbox_id"], user["id"]))
+        conn.commit()
     return result
 
 @app.post("/api/sandbox/stop")
-async def sandbox_stop(user: dict = Depends(get_current_user)):
-    """Stop the current user's sandbox."""
+async def sb_stop(user: dict = Depends(get_current_user)):
     result = await stop_sandbox(user["id"])
-    if "error" in result and not result.get("deleted"):
-        raise HTTPException(400, result["error"])
+    if result.get("deleted"):
+        conn.execute("UPDATE users SET sandbox_id = '' WHERE id = ?", (user["id"],))
+        conn.commit()
     return result
 
 @app.get("/api/sandbox/status")
-async def sandbox_status_endpoint(user: dict = Depends(get_current_user)):
-    """Get sandbox status for the current user."""
-    result = await get_sandbox_status(user["id"])
-    return result
+async def sb_status(user: dict = Depends(get_current_user)):
+    return await get_sandbox_status(user["id"])
 
-@app.post("/api/sandbox/exec")
-async def sandbox_exec(req: SandboxExecReq, user: dict = Depends(get_current_user)):
-    """Execute a command in the user's sandbox."""
-    result = await exec_in_sandbox(user["id"], req.command, req.language)
-    if "error" in result:
-        raise HTTPException(400, result["error"])
-    return result
-
-# ── Admin Routes ──
+# ── Admin ──
 @app.post("/api/admin/login")
-def admin_login(req: AdminLoginReq):
+def admin_login(req: LoginReq):
     user = conn.execute("SELECT * FROM users WHERE email = ? AND is_admin = 1", (req.email,)).fetchone()
     if not user or not hashlib.sha256(req.password.encode()).hexdigest() == user["password_hash"]:
         raise HTTPException(401, "Invalid admin credentials")
@@ -1036,322 +441,115 @@ def admin_login(req: AdminLoginReq):
 
 @app.get("/api/admin/stats")
 def admin_stats(admin: dict = Depends(get_admin_user)):
-    total_users = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
-    active_users = conn.execute("SELECT COUNT(*) as c FROM users WHERE banned = 0").fetchone()["c"]
-    banned_users = conn.execute("SELECT COUNT(*) as c FROM users WHERE banned = 1").fetchone()["c"]
-    signups_today = conn.execute("SELECT COUNT(*) as c FROM users WHERE created_at >= datetime('now', 'start of day')").fetchone()["c"]
-    total_sessions = conn.execute("SELECT COUNT(*) as c FROM sessions").fetchone()["c"]
-    notif_unread = conn.execute("SELECT COUNT(*) as c FROM admin_notifications WHERE read = 0").fetchone()["c"]
-    return {"total_users": total_users, "active_users": active_users, "banned_users": banned_users, "signups_today": signups_today, "total_sessions": total_sessions, "notifications_unread": notif_unread}
+    return {"total_users": conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"],
+        "active_users": conn.execute("SELECT COUNT(*) as c FROM users WHERE banned = 0").fetchone()["c"],
+        "banned_users": conn.execute("SELECT COUNT(*) as c FROM users WHERE banned = 1").fetchone()["c"],
+        "verified_users": conn.execute("SELECT COUNT(*) as c FROM users WHERE email_verified = 1").fetchone()["c"],
+        "signups_today": conn.execute("SELECT COUNT(*) as c FROM users WHERE created_at >= datetime('now', 'start of day')").fetchone()["c"]}
 
 @app.get("/api/admin/users")
 def admin_users(search: str = "", page: int = 1, limit: int = 20, admin: dict = Depends(get_admin_user)):
     offset = (page - 1) * limit
+    where = ""
+    params = []
     if search:
-        rows = conn.execute("SELECT id, username, name, email, provider, is_admin, banned, created_at FROM users WHERE username LIKE ? OR email LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?", (f"%{search}%", f"%{search}%", limit, offset)).fetchall()
-        total = conn.execute("SELECT COUNT(*) as c FROM users WHERE username LIKE ? OR email LIKE ?", (f"%{search}%", f"%{search}%")).fetchone()["c"]
-    else:
-        rows = conn.execute("SELECT id, username, name, email, provider, is_admin, banned, created_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
-        total = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
+        where = "WHERE username LIKE ? OR email LIKE ?"
+        params = [f"%{search}%", f"%{search}%"]
+    rows = conn.execute(f"SELECT id, username, name, email, email_verified, is_admin, banned, created_at FROM users {where} ORDER BY created_at DESC LIMIT ? OFFSET ?", params + [limit, offset]).fetchall()
+    total = conn.execute(f"SELECT COUNT(*) as c FROM users {where}", params).fetchone()["c"]
     return {"users": [dict(r) for r in rows], "total": total, "page": page, "pages": max(1, (total + limit - 1) // limit)}
 
-@app.get("/api/admin/users/{user_id}")
-def admin_user_detail(user_id: str, admin: dict = Depends(get_admin_user)):
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    if not user: raise HTTPException(404, "User not found")
-    u = dict(user)
-    u["api_key"] = "••••" + u["api_key"][-4:] if u.get("api_key") else ""
-    u["oauth_tokens"] = {k: "••••" for k in (json.loads(u["oauth_tokens"]) if u.get("oauth_tokens") else {}).keys()}
-    return u
-
 @app.post("/api/admin/users/{user_id}/ban")
-def admin_ban_user(user_id: str, admin: dict = Depends(get_admin_user)):
+def admin_ban(user_id: str, admin: dict = Depends(get_admin_user)):
     conn.execute("UPDATE users SET banned = 1 WHERE id = ?", (user_id,))
     conn.commit()
-    create_notification("user_banned", f"User banned", f"User {user_id} was banned by admin", "warning")
-    return {"status": "banned", "message": f"User {user_id} banned and sandbox will be cleared"}
+    return {"status": "banned"}
 
 @app.post("/api/admin/users/{user_id}/unban")
-def admin_unban_user(user_id: str, admin: dict = Depends(get_admin_user)):
+def admin_unban(user_id: str, admin: dict = Depends(get_admin_user)):
     conn.execute("UPDATE users SET banned = 0 WHERE id = ?", (user_id,))
     conn.commit()
     return {"status": "unbanned"}
 
 @app.delete("/api/admin/users/{user_id}")
-def admin_delete_user(user_id: str, admin: dict = Depends(get_admin_user)):
-    conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM memories WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM oauth_flows WHERE user_id = ?", (user_id,))
+def admin_delete(user_id: str, admin: dict = Depends(get_admin_user)):
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
-    create_notification("user_deleted", "User deleted", f"User {user_id} and all data deleted by admin", "info")
     return {"status": "deleted"}
 
 @app.get("/api/admin/config")
 def admin_get_config(admin: dict = Depends(get_admin_user)):
     rows = conn.execute("SELECT key, value FROM admin_config ORDER BY key").fetchall()
-    config = {}
-    for r in rows:
-        val = r["value"]
-        # Mask sensitive keys
-        if any(k in r["key"] for k in ["secret", "password", "key", "token"]):
-            val = mask_value(val)
-        config[r["key"]] = val
-    return {"config": config}
+    return {"config": {r["key"]: r["value"] for r in rows}}
 
 @app.post("/api/admin/config")
-def admin_set_config(req: ConfigUpdateReq, admin: dict = Depends(get_admin_user)):
-    conn.execute("INSERT OR REPLACE INTO admin_config (key, value, updated_at) VALUES (?, ?, datetime('now'))", (req.key, req.value))
+def admin_set_config(key: str = "", value: str = "", admin: dict = Depends(get_admin_user)):
+    conn.execute("INSERT OR REPLACE INTO admin_config (key, value, updated_at) VALUES (?, ?, datetime('now'))", (key, value))
     conn.commit()
-    return {"status": "ok", "key": req.key}
-
-@app.get("/api/admin/config/check/{key}")
-def admin_check_config(key: str, admin: dict = Depends(get_admin_user)):
-    row = conn.execute("SELECT value FROM admin_config WHERE key = ?", (key,)).fetchone()
-    has_value = bool(row and row["value"])
-    return {"key": key, "configured": has_value}
+    return {"status": "ok"}
 
 @app.get("/api/admin/notifications")
-def admin_get_notifications(admin: dict = Depends(get_admin_user)):
+def admin_notifications(admin: dict = Depends(get_admin_user)):
     rows = conn.execute("SELECT * FROM admin_notifications ORDER BY read ASC, created_at DESC LIMIT 50").fetchall()
     return {"notifications": [dict(r) for r in rows]}
 
-@app.post("/api/admin/notifications/{notif_id}/read")
-def admin_read_notification(notif_id: int, admin: dict = Depends(get_admin_user)):
-    conn.execute("UPDATE admin_notifications SET read = 1 WHERE id = ?", (notif_id,))
+@app.post("/api/admin/notifications/{nid}/read")
+def admin_read_notif(nid: int, admin: dict = Depends(get_admin_user)):
+    conn.execute("UPDATE admin_notifications SET read = 1 WHERE id = ?", (nid,))
     conn.commit()
     return {"status": "ok"}
 
-@app.post("/api/admin/notifications/read-all")
-def admin_read_all_notifications(admin: dict = Depends(get_admin_user)):
-    conn.execute("UPDATE admin_notifications SET read = 1 WHERE read = 0")
-    conn.commit()
-    return {"status": "ok"}
-
-@app.get("/api/admin/mail")
-def admin_get_mail(admin: dict = Depends(get_admin_user)):
-    rows = conn.execute("SELECT * FROM admin_mail ORDER BY received_at DESC LIMIT 50").fetchall()
-    return {"mail": [dict(r) for r in rows]}
-
-@app.get("/api/admin/mail/{mail_id}")
-def admin_get_mail_detail(mail_id: int, admin: dict = Depends(get_admin_user)):
-    row = conn.execute("SELECT * FROM admin_mail WHERE id = ?", (mail_id,)).fetchone()
-    if not row: raise HTTPException(404, "Mail not found")
-    return dict(row)
-
-@app.post("/api/admin/mail/{mail_id}/read")
-def admin_read_mail(mail_id: int, admin: dict = Depends(get_admin_user)):
-    conn.execute("UPDATE admin_mail SET read = 1 WHERE id = ?", (mail_id,))
-    conn.commit()
-    return {"status": "ok"}
-
-@app.delete("/api/admin/mail/{mail_id}")
-def admin_delete_mail(mail_id: int, admin: dict = Depends(get_admin_user)):
-    conn.execute("DELETE FROM admin_mail WHERE id = ?", (mail_id,))
-    conn.commit()
-    return {"status": "deleted"}
-
-@app.post("/api/admin/automation/cleanup-banned")
-def admin_cleanup_banned(admin: dict = Depends(get_admin_user)):
-    banned = conn.execute("SELECT id, username FROM users WHERE banned = 1").fetchall()
-    for u in banned:
-        conn.execute("DELETE FROM sessions WHERE user_id = ?", (u["id"],))
-        conn.execute("DELETE FROM memories WHERE user_id = ?", (u["id"],))
-        conn.execute("DELETE FROM oauth_flows WHERE user_id = ?", (u["id"],))
-    conn.execute("INSERT INTO automation_log (action, status, details) VALUES ('cleanup_banned', 'completed', ?)", (json.dumps([dict(u) for u in banned]),))
-    conn.commit()
-    return {"status": "ok", "cleaned": len(banned), "users": [dict(u) for u in banned]}
-
-@app.post("/api/admin/automation/clear-cache")
-def admin_clear_cache(admin: dict = Depends(get_admin_user)):
-    # Clear skills cache
-    global DEFAULT_SKILLS_CACHE
-    DEFAULT_SKILLS_CACHE = None
-    conn.execute("INSERT INTO automation_log (action, status, details) VALUES ('clear_cache', 'completed', 'Skills cache cleared')")
-    conn.commit()
-    return {"status": "ok", "message": "Cache cleared"}
-
-@app.get("/api/admin/automation/logs")
-def admin_automation_logs(admin: dict = Depends(get_admin_user)):
-    rows = conn.execute("SELECT * FROM automation_log ORDER BY created_at DESC LIMIT 50").fetchall()
-    return {"logs": [dict(r) for r in rows]}
-
-
-@app.get('/v1/user/models')
-def list_user_providers(user = Depends(get_current_user)):
-    '''List all models from ALL connected providers (API key + OAuth).'''
-    api_key = user.get('api_key', '')
-    try: oauth = json.loads(user['oauth_tokens']) if user['oauth_tokens'] else {}
-    except: oauth = {}
-    current = user.get('provider', 'openai')
-    
-    api_key_provs = []
-    if api_key and current:
-        info = ALL_PROVIDERS.get(current, {})
-        for m in info.get('models', []):
-            api_key_provs.append({'id': m, 'provider': current, 'name': info['name'], 'auth': 'api_key'})
-    
-    oauth_provs = []
-    for pid, token in oauth.items():
-        info = ALL_PROVIDERS.get(pid, {})
-        for m in info.get('models', []):
-            oauth_provs.append({'id': m, 'provider': pid, 'name': info['name'], 'auth': 'oauth'})
-    
-    return {'object': 'list', 'data': api_key_provs + oauth_provs}
-
-
-# ── OpenAI-compatible API (v1) — proxy to user's connected model ──
-# These endpoints make bapx.in work as any OpenAI-compatible endpoint.
-# User authenticates with their bapX JWT token, the proxy uses their stored
-# credentials (API key or OAuth token) to route to the actual provider.
-PROXY_USER_AGENT = "bapX/0.2 (+https://bapx.in)"
-
-@app.post("/v1/chat/completions")
-async def v1_chat_completions(request: Request, user: dict = Depends(get_current_user)):
-    provider = user.get("provider", "openai")
-    api_key = user.get("api_key", "")
-    try:
-        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
-    except Exception:
-        oauth_tokens = {}
-    credential = api_key or oauth_tokens.get(provider, "")
-    if not credential:
-        raise HTTPException(401, "No credential configured for this provider. Add an API key or connect via OAuth in Settings.")
-
-    prov_info = ALL_PROVIDERS.get(provider, {})
-    if prov_info.get("auth") == "oauth":
-        oauth_type = prov_info.get("oauth_type", "")
-        oauth_cfg = OAUTH_CONFIGS.get(oauth_type, {})
-        base_url = oauth_cfg.get("proxies_to", {}).get("base_url", "")
-    else:
-        base_url = prov_info.get("base_url", "")
-    if not base_url:
-        raise HTTPException(400, f"Unknown base URL for provider: {provider}")
-
-    body = await request.json()
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {credential}",
-        "User-Agent": PROXY_USER_AGENT,
-    }
-    # OpenRouter requires Referer + X-Title headers
-    if provider == "openrouter":
-        headers["HTTP-Referer"] = "https://bapx.in"
-        headers["X-Title"] = "bapX Agent"
-    # Anthropic uses x-api-key header, not Bearer
-    if provider == "anthropic":
-        headers["x-api-key"] = credential
-        del headers["Authorization"]
-    # Ensure base_url ends with /v1 for OpenAI-compatible providers
-    if not base_url.endswith("/v1") and provider not in ("anthropic", "google", "perplexity"):
-        base_url = base_url.rstrip("/") + "/v1"
-    is_stream = body.get("stream", False)
-
-    try:
-        async with httpx.AsyncClient(timeout=120) as client:
-            if is_stream:
-                async def stream_response():
-                    try:
-                        async with client.stream("POST", f"{base_url}/chat/completions", json=body, headers=headers) as resp:
-                            async for chunk in resp.aiter_bytes():
-                                yield chunk
-                    except Exception as e:
-                        yield f"data: {{\"error\": \"{str(e)}\"}}\n\n".encode()
-                return StreamingResponse(stream_response(), media_type="text/event-stream")
-            else:
-                resp = await client.post(f"{base_url}/chat/completions", json=body, headers=headers)
-                return resp.json()
-    except httpx.TimeoutException:
-        raise HTTPException(504, "Provider request timed out")
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(e.response.status_code, f"Provider error: {e.response.text[:200]}")
-    except Exception as e:
-        raise HTTPException(502, f"Proxy error: {str(e)[:200]}")
-
-@app.get("/v1/models")
-async def v1_models(user: dict = Depends(get_current_user)):
-    provider = user.get("provider", "openai")
-    prov_info = ALL_PROVIDERS.get(provider, {})
-    models = prov_info.get("models", [])
-    return {
-        "object": "list",
-        "data": [
-            {"id": m, "object": "model", "created": int(time.time()), "owned_by": provider}
-            for m in models
-        ],
-    }
-
-@app.post("/v1/models")
-async def v1_models_post(user: dict = Depends(get_current_user)):
-    return await v1_models(user)
-
-# ── Billing ENDPOINTS ──
+# ── Billing ──
 @app.post('/api/billing/create-checkout')
 async def create_checkout(user: dict = Depends(get_current_user)):
-    """Create Stripe checkout session for storage plan."""
     sk = conn.execute("SELECT value FROM admin_config WHERE key = 'stripe_secret_key'").fetchone()
-    bp = conn.execute("SELECT value FROM admin_config WHERE key = 'billing_plan_base_price'").fetchone()
     if not sk or not sk['value']:
-        raise HTTPException(400, 'Stripe not configured. Set stripe_secret_key in admin.')
+        raise HTTPException(400, 'Stripe not configured')
     stripe.api_key = sk['value']
-    price = int(bp['value']) if bp and bp['value'] else 5
-    try:
-        sess = stripe.checkout.Session.create(
-            mode='subscription',
-            line_items=[{'price_data': {'currency': 'usd', 'product_data': {'name': 'bapX Starter - 5GB'}, 'unit_amount': price * 100}, 'quantity': 1}],
-            metadata={'user_id': user['id']},
-            success_url='https://bapx.in/dashboard?billing=success',
-            cancel_url='https://bapx.in/dashboard?billing=canceled',
-        )
-        return {'url': sess.url, 'session_id': sess.id}
-    except Exception as e:
-        raise HTTPException(500, f'Stripe error: {str(e)}')
+    bp = int(conn.execute("SELECT value FROM admin_config WHERE key = 'billing_plan_base_price'").fetchone()['value'] or 5)
+    sess = stripe.checkout.Session.create(mode='subscription',
+        line_items=[{'price_data': {'currency': 'usd', 'product_data': {'name': 'bapX Starter - 5GB'}, 'unit_amount': bp * 100}, 'quantity': 1}],
+        metadata={'user_id': user['id']}, success_url='https://bapx.in/dashboard?billing=success',
+        cancel_url='https://bapx.in/dashboard?billing=canceled')
+    return {'url': sess.url, 'session_id': sess.id}
 
 @app.post('/api/billing/webhook')
 async def billing_webhook(request: Request):
-    """Stripe webhook for subscription events."""
     sk = conn.execute("SELECT value FROM admin_config WHERE key = 'stripe_secret_key'").fetchone()
     ws = conn.execute("SELECT value FROM admin_config WHERE key = 'stripe_webhook_secret'").fetchone()
-    if sk and sk['value']:
-        stripe.api_key = sk['value']
     payload = await request.body()
     sig = request.headers.get('stripe-signature', '')
     try:
-        event = stripe.Webhook.construct_event(payload, sig, ws['value'] if ws else '')
+        event = stripe.Webhook.construct_event(payload, sig, ws['value'] if ws and ws['value'] else '')
     except Exception:
         raise HTTPException(400, 'Invalid webhook signature')
     if event['type'] == 'checkout.session.completed':
-        sess_obj = event['data']['object']
-        uid = sess_obj.get('metadata', {}).get('user_id', '')
+        uid = event['data']['object'].get('metadata', {}).get('user_id', '')
         if uid:
-            sub_id = sess_obj.get('subscription', '')
+            sub_id = event['data']['object'].get('subscription', '')
             conn.execute("UPDATE users SET stripe_sub_id = ?, stripe_status = 'active' WHERE id = ?", (sub_id, uid))
             conn.commit()
     return {'status': 'ok'}
 
 @app.get('/api/billing/subscription')
 def get_subscription(user: dict = Depends(get_current_user)):
-    """Get user's current subscription and storage usage."""
-    return {
-        'status': user.get('stripe_status', 'none'),
+    return {'status': user.get('stripe_status', 'none'),
         'plan': 'Starter' if user.get('stripe_status') == 'active' else 'None',
         'storage_limit_gb': 5 if user.get('stripe_status') == 'active' else 0,
         'storage_used_bytes': user.get('storage_used', 0),
-        'subscription_id': user.get('stripe_sub_id', None),
-    }
+        'subscription_id': user.get('stripe_sub_id', None)}
 
 # ── Health ──
 @app.get("/health")
 def health():
-    user_count = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
-    skill_count = len(get_default_skills())
-    return {"status": "ok", "service": "bapx-api", "users": user_count, "skills": skill_count}
+    return {"status": "ok", "service": "bapx-api",
+        "users": conn.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]}
 
 # ── Static Files ──
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 # ── Main ──
 if __name__ == "__main__":
-    import uvicorn, random
+    import uvicorn
     port = int(os.environ.get("PORT", "7654"))
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
