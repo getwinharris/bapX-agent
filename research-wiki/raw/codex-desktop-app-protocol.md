@@ -12,7 +12,7 @@ cross-refs: [codex-macos, design-system-codex]
 # Codex Desktop App Protocol Analysis
 
 > Extracted from the `app-server-protocol` JSON schemas, `app-server-client` Rust crate, and `app-server-daemon` lifecycle management.
-> Source: `/root/Dev/codex/codex-rs/app-server-protocol/schema/json/`
+> Source: `/root/Dev/bapx/bapX-src/codex-rs/app-server-protocol/schema/json/`
 
 ---
 
@@ -593,7 +593,7 @@ This confirms the actual desktop app uses **light mode by default** with dark mo
 
 ## 9. Complete Protocol Schema Index
 
-All schema files at `/root/Dev/codex/codex-rs/app-server-protocol/schema/json/`:
+All schema files at `/root/Dev/bapx/bapX-src/codex-rs/app-server-protocol/schema/json/`:
 
 ### Base (root)
 - `ClientRequest.json` — All request types with full parameter schemas

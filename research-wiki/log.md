@@ -1,5 +1,5 @@
 ## [2026-05-24] ingest | Full Codex macOS TUI architecture
-- Extracted from source code at /root/Dev/codex/codex-rs/tui/
+- Extracted from source code at /root/Dev/bapx/bapX-src/codex-rs/tui/
 - 356-line architecture doc covering 30+ TUI modules
 - Component tree: App → ChatWidget → BottomPane → Popups
 - 11 history cell variants, diff renderer, popup system

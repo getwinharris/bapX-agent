@@ -12,7 +12,7 @@ cross-refs: [codex-macos, codex-desktop-app-protocol]
 # Codex macOS Desktop Design System
 
 > Design token analysis extracted from the actual Codex desktop application source code.
-> Sources: `/root/Dev/codex/codex-rs/login/src/assets/success.html`, `error.html`, app-server protocol JSON schemas, desktop app launcher.
+> Sources: `/root/Dev/bapx/bapX-src/codex-rs/login/src/assets/success.html`, `error.html`, app-server protocol JSON schemas, desktop app launcher.
 
 ---
 

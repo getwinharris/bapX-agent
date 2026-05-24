@@ -53,8 +53,8 @@
 | [manus-page-structure.txt](raw/manus-page-structure.txt) | Full page layout structure + design tokens | Live manus.im inspection | 2026-05-24 |
 | [manus-feature-inventory.txt](raw/manus-feature-inventory.txt) | 50+ feature catalog from docs index | manus.im/docs/llms.txt | 2026-05-24 |
 | [codex-design-notes.txt](raw/codex-design-notes.txt) | macOS app layout architecture + components | OpenAI Codex SDK + implementation | 2026-05-24 |
-| [codex-tui-architecture.md](raw/codex-tui-architecture.md) | Complete TUI component tree (356 lines) | /root/Dev/codex/codex-rs/tui/ source | 2026-05-24 |
-| [codex-brand-assets.md](raw/codex-brand-assets.md) | Brand colors, splash, pets, CLI banner | /root/Dev/codex/ source inspection | 2026-05-24 |
+| [codex-tui-architecture.md](raw/codex-tui-architecture.md) | Complete TUI component tree (356 lines) | /root/Dev/bapx/bapX-src/codex-rs/tui/ source | 2026-05-24 |
+| [codex-brand-assets.md](raw/codex-brand-assets.md) | Brand colors, splash, pets, CLI banner | /root/Dev/bapx/bapX-src/ source inspection | 2026-05-24 |
 | [manus-im-homepage.png](raw/manus-im-homepage.png) | Screenshot of live homepage | Live https://manus.im | 2026-05-24 |
 | [manus-im-landing.png](raw/manus-im-landing.png) | Screenshot of landing page | Live https://manus.im | 2026-05-24 |
 

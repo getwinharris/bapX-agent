@@ -12,7 +12,7 @@ cross-refs: [codex-desktop-app-protocol, design-system-codex, manus-vs-codex-ui,
 # Codex macOS Desktop App Architecture
 
 > Extracted from the actual app-server protocol source code, desktop app launcher, and daemon lifecycle management.
-> Source code examined: `/root/Dev/codex/codex-rs/` — `desktop_app/`, `app-server-protocol/`, `app-server-client/`, `app-server-daemon/`, `login/src/assets/`
+> Source code examined: `/root/Dev/bapx/bapX-src/codex-rs/` — `desktop_app/`, `app-server-protocol/`, `app-server-client/`, `app-server-daemon/`, `login/src/assets/`
 
 ---
 
