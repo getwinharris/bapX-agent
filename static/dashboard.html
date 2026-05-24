@@ -854,7 +854,8 @@ async function sendMessage(){
   document.getElementById('send-btn').disabled = true;
 
   try{
-    var res = await api('POST','/api/chat/send',{message: msg, session_id: currentSessionId});
+    // Use the agent runtime (OpenAI Agents SDK + Codex)
+    var res = await api('POST','/api/agent/run',{message: msg, session_id: currentSessionId});
     var reader = res.body.getReader();
     var decoder = new TextDecoder();
     var fullText = '';
@@ -881,6 +882,22 @@ async function sendMessage(){
               fullText += parsed.choices[0].delta.content;
               hasContent = true;
               msgDiv.innerHTML = marked(fullText);
+            }
+            // Agent runtime format (OpenAI Agents SDK)
+            if(parsed.text){
+              fullText += parsed.text;
+              hasContent = true;
+              msgDiv.innerHTML = marked(fullText);
+            }
+            if(parsed.final && !hasContent){
+              fullText = parsed.final;
+              hasContent = true;
+              msgDiv.innerHTML = marked(fullText);
+            }
+            // Tool call indicator
+            if(parsed.tool_call){
+              var tc = '<div style="font-size:.75rem;color:var(--accent);padding:.25rem 0">🔧 Using tool: ' + escapeHtml(parsed.tool_call.name || 'unknown') + '...</div>';
+              if(!hasContent) msgDiv.innerHTML = tc;
             }
           }catch(e){
             if(data && !hasContent){
