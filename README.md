@@ -99,10 +99,26 @@ Two-Codex pipeline: Your direction → CEO writes spec → CTO builds → Review
 ```
 bapx.in ── Caddy ──► FastAPI :7654
                        ├── /api/* — REST endpoints
-                       ├── /api/chat/send — SSE streaming
-                       ├── static/ — dashboard.html + index.html
-                       └── /health — health check
+                       ├── /api/agent/run — OpenAI Agents SDK orchestration (SSE)
+                       ├── /api/chat/send — Direct provider chat (SSE, fallback)
+                       ├── /api/sandbox/* — OpenSandbox lifecycle per user
+                       ├── /api/admin/* — Admin panel (CEO/Founder)
+                       ├── /api/tts — KittenTTS voice
+                       ├── /api/memory/* — Cross-session memory
+                       ├── static/dashboard.html — User SPA
+                       ├── static/admin.html — Admin SPA
+                       └── /health — Health check
 ```
+
+## Integrated Stack
+
+| Layer | Tool | What it does | Status |
+|-------|------|-------------|--------|
+| Orchestration | OpenAI Agents SDK | Creates agent per user with WebSearchTool + sandbox_execute, streams responses | ✅ Integrated at `/api/agent/run` |
+| Sandbox | OpenSandbox SDK | Per-user isolated Docker sandbox, lifecycle management | ✅ Integrated at `/api/sandbox/*` |
+| Agent Runtime | Codex CLI | Available for execution inside sandbox as powered CTO | ✅ Installed at `~/.hermes/node/bin/codex` |
+| Dashboard Chat | Agent runtime | User messages route through agent runtime by default | ✅ Wired to `/api/agent/run` |
+| Admin Panel | FastAPI + SPA | CEO/Founder manages users, config, billing, notifications | ✅ At `/admin.html` |
 
 ## Files
 
