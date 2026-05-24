@@ -1086,6 +1086,104 @@ def admin_automation_logs(admin: dict = Depends(get_admin_user)):
     rows = conn.execute("SELECT * FROM automation_log ORDER BY created_at DESC LIMIT 50").fetchall()
     return {"logs": [dict(r) for r in rows]}
 
+
+@app.get('/v1/user/models')
+def list_user_providers(user = Depends(get_current_user)):
+    '''List all models from ALL connected providers (API key + OAuth).'''
+    api_key = user.get('api_key', '')
+    try: oauth = json.loads(user['oauth_tokens']) if user['oauth_tokens'] else {}
+    except: oauth = {}
+    current = user.get('provider', 'openai')
+    
+    api_key_provs = []
+    if api_key and current:
+        info = ALL_PROVIDERS.get(current, {})
+        for m in info.get('models', []):
+            api_key_provs.append({'id': m, 'provider': current, 'name': info['name'], 'auth': 'api_key'})
+    
+    oauth_provs = []
+    for pid, token in oauth.items():
+        info = ALL_PROVIDERS.get(pid, {})
+        for m in info.get('models', []):
+            oauth_provs.append({'id': m, 'provider': pid, 'name': info['name'], 'auth': 'oauth'})
+    
+    return {'object': 'list', 'data': api_key_provs + oauth_provs}
+
+
+# ── OpenAI-compatible API (v1) — proxy to user's connected model ──
+# These endpoints make bapx.in work as any OpenAI-compatible endpoint.
+# User authenticates with their bapX JWT token, the proxy uses their stored
+# credentials (API key or OAuth token) to route to the actual provider.
+PROXY_USER_AGENT = "bapX/0.2 (+https://bapx.in)"
+
+@app.post("/v1/chat/completions")
+async def v1_chat_completions(request: Request, user: dict = Depends(get_current_user)):
+    provider = user.get("provider", "openai")
+    api_key = user.get("api_key", "")
+    try:
+        oauth_tokens = json.loads(user["oauth_tokens"]) if user["oauth_tokens"] else {}
+    except Exception:
+        oauth_tokens = {}
+    credential = api_key or oauth_tokens.get(provider, "")
+    if not credential:
+        raise HTTPException(401, "No credential configured for this provider. Add an API key or connect via OAuth in Settings.")
+
+    prov_info = ALL_PROVIDERS.get(provider, {})
+    if prov_info.get("auth") == "oauth":
+        oauth_type = prov_info.get("oauth_type", "")
+        oauth_cfg = OAUTH_CONFIGS.get(oauth_type, {})
+        base_url = oauth_cfg.get("proxies_to", {}).get("base_url", "")
+    else:
+        base_url = prov_info.get("base_url", "")
+    if not base_url:
+        raise HTTPException(400, f"Unknown base URL for provider: {provider}")
+
+    body = await request.json()
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {credential}",
+        "User-Agent": PROXY_USER_AGENT,
+    }
+    is_stream = body.get("stream", False)
+
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            if is_stream:
+                async def stream_response():
+                    try:
+                        async with client.stream("POST", f"{base_url}/chat/completions", json=body, headers=headers) as resp:
+                            async for chunk in resp.aiter_bytes():
+                                yield chunk
+                    except Exception as e:
+                        yield f"data: {{\"error\": \"{str(e)}\"}}\n\n".encode()
+                return StreamingResponse(stream_response(), media_type="text/event-stream")
+            else:
+                resp = await client.post(f"{base_url}/chat/completions", json=body, headers=headers)
+                return resp.json()
+    except httpx.TimeoutException:
+        raise HTTPException(504, "Provider request timed out")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(e.response.status_code, f"Provider error: {e.response.text[:200]}")
+    except Exception as e:
+        raise HTTPException(502, f"Proxy error: {str(e)[:200]}")
+
+@app.get("/v1/models")
+async def v1_models(user: dict = Depends(get_current_user)):
+    provider = user.get("provider", "openai")
+    prov_info = ALL_PROVIDERS.get(provider, {})
+    models = prov_info.get("models", [])
+    return {
+        "object": "list",
+        "data": [
+            {"id": m, "object": "model", "created": int(time.time()), "owned_by": provider}
+            for m in models
+        ],
+    }
+
+@app.post("/v1/models")
+async def v1_models_post(user: dict = Depends(get_current_user)):
+    return await v1_models(user)
+
 # ── Health ──
 @app.get("/health")
 def health():

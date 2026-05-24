@@ -211,9 +211,13 @@ a{color:var(--accent);text-decoration:none}
 .oauth-card h4{font-size:.8125rem;font-weight:600}
 .oauth-card p{font-size:.6875rem;color:var(--muted)}
 
-/* Responsive */
+/* Responsive - mobile: show icon-only sidebar by default, expand on tap */
 @media(max-width:768px){
-  .sidebar-desktop{width:0!important;overflow:hidden!important}
+  .sidebar-desktop{width:48px!important;overflow:hidden!important}
+  .sidebar-icon .nav-label{display:none!important}
+  .sidebar-desktop .nav-label{display:none!important}
+  .sidebar-desktop .sidebar-logo{font-size:0!important}
+  .sidebar-desktop .avatar{width:28px!important;height:28px!important;font-size:.75rem!important}
   .sidebar-header{padding:.75rem!important}
   .hamburger{display:block!important}
   .sidebar.mobile-expanded{width:256px!important;position:fixed!important;left:0;top:0;bottom:0;z-index:100;box-shadow:4px 0 20px rgba(0,0,0,0.5);overflow-y:auto!important}
