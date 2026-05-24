@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>bapX — About</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0f0f13;--bg2:#14141c;--bg3:#1a1a24;--fg:#e8e8f0;--muted:#6b7280;--accent:#9651b8;--accent-hover:#7a3f9e;--accent-light:rgba(150,81,184,0.12);--border:rgba(255,255,255,0.06);--radius:8px;--radius-lg:12px;--radius-xl:16px}
+    html{scroll-behavior:smooth;height:-webkit-fill-available}
+    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;line-height:1.6;min-height:100dvh}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{color:#c084fc}
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;background:rgba(15,15,19,0.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:56px}
+    .nav-logo{font-size:1.375rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,#b35fd9,#7a3f9e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .nav-links{display:flex;align-items:center;gap:1.5rem}
+    .nav-links a{font-size:.875rem;font-weight:500;color:#9ca3af}
+    .nav-links a:hover{color:var(--fg)}
+    .nav-links a.active{color:var(--fg)}
+    .nav-cta{padding:.5rem 1.25rem;background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff!important;border-radius:var(--radius);font-weight:600;font-size:.8125rem}
+    .nav-cta:hover{box-shadow:0 4px 16px rgba(150,81,184,0.3);transform:translateY(-1px)}
+    .mobile-menu-btn{display:none;background:none;border:none;color:var(--fg);cursor:pointer;padding:4px}
+    .mobile-menu{display:none}
+    @media(max-width:768px){
+      .nav-links{display:none}
+      .mobile-menu-btn{display:block}
+      .mobile-menu{position:fixed;top:56px;left:0;right:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem;display:none;flex-direction:column;gap:.75rem;z-index:99}
+      .mobile-menu.open{display:flex}
+      .mobile-menu a{font-size:.9375rem;padding:.5rem 0;color:#9ca3af}
+      .mobile-menu .nav-cta{text-align:center;padding:.75rem}
+    }
+    .page-title{padding-top:7rem;padding-bottom:2rem;text-align:center}
+    .page-title h1{font-size:3rem;font-weight:800;letter-spacing:-0.04em;line-height:1.1;margin-bottom:1rem}
+    .page-title p{font-size:1.125rem;color:var(--muted);max-width:600px;margin:0 auto}
+    section{padding:3rem 1.5rem;max-width:800px;margin:0 auto}
+    .center{text-align:center}
+    .section-label{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+    h2{font-size:2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:1.5rem}
+    .about-text{font-size:.9375rem;color:#9ca3af;line-height:1.8;margin-bottom:1.5rem}
+    .about-text strong{color:var(--fg)}
+    .values-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-top:2rem}
+    @media(max-width:768px){.values-grid{grid-template-columns:1fr}}
+    .value-card{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;transition:all .3s}
+    .value-card:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-2px)}
+    .value-card h3{font-size:.9375rem;font-weight:700;margin-bottom:.375rem}
+    .value-card p{font-size:.8125rem;color:var(--muted);line-height:1.6}
+    .team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:2rem;max-width:600px;margin-left:auto;margin-right:auto}
+    @media(max-width:768px){.team-grid{grid-template-columns:1fr;max-width:300px}}
+    .team-card{text-align:center;padding:1.5rem;background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-lg)}
+    .team-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-hover));margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;color:#fff}
+    .team-card h3{font-size:.9375rem;font-weight:700;margin-bottom:.25rem}
+    .team-card p{font-size:.8125rem;color:var(--muted)}
+    .divider{height:1px;background:var(--border);margin:0 auto;max-width:1100px}
+    footer{padding:2rem 1.5rem 3rem;border-top:1px solid var(--border);text-align:center}
+    footer p{font-size:.8125rem;color:var(--muted)}
+    footer .footer-links{display:flex;justify-content:center;gap:2rem;margin-bottom:1rem;flex-wrap:wrap}
+    footer .footer-links a{font-size:.8125rem;color:var(--muted)}
+    footer .footer-links a:hover{color:var(--fg)}
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">bapX</a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/pricing.html">Pricing</a>
+    <a href="/about.html" class="active">About</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/dashboard.html#login">Sign In</a>
+    <a href="/dashboard.html#signup" class="nav-cta">Get Started</a>
+  </div>
+  <button class="mobile-menu-btn" onclick="toggleMobile()" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+</nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="/" onclick="toggleMobile()">Home</a>
+  <a href="/pricing.html" onclick="toggleMobile()">Pricing</a>
+  <a href="/about.html" onclick="toggleMobile()">About</a>
+  <a href="/docs.html" onclick="toggleMobile()">Docs</a>
+  <a href="/dashboard.html#login" onclick="toggleMobile()">Sign In</a>
+  <a href="/dashboard.html#signup" class="nav-cta" onclick="toggleMobile()">Get Started</a>
+</div>
+
+<section class="page-title">
+  <h1>About <span style="background:linear-gradient(135deg,#b35fd9,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">bapX</span></h1>
+  <p>Your AI agent platform — connect your models, unlock your productivity.</p>
+</section>
+
+<section class="center">
+  <h2>Our Mission</h2>
+  <p class="about-text">
+    <strong>bapX</strong> exists to give everyone access to a powerful AI agent — without the lock-in. 
+    We believe you should own your AI experience: connect your existing subscriptions 
+    (ChatGPT Plus, Claude Pro, API keys, and more) and get a unified agent workspace 
+    that works the way <em>you</em> want.
+  </p>
+  <p class="about-text">
+    No artificial limits, no per-token charges, no feature tiers. Just a platform 
+    where your AI works for you, powered by whatever models you choose.
+  </p>
+</section>
+
+<div class="divider"></div>
+
+<section class="center">
+  <h2>Our Values</h2>
+  <div class="values-grid">
+    <div class="value-card">
+      <h3>🔓 Freedom of Choice</h3>
+      <p>Use any AI provider. Connect via API key, OAuth, or Copilot — we don't lock you into one ecosystem.</p>
+    </div>
+    <div class="value-card">
+      <h3>🛡️ Privacy First</h3>
+      <p>Your API keys and OAuth tokens are encrypted. Your sandbox is isolated. Your data stays yours.</p>
+    </div>
+    <div class="value-card">
+      <h3>⚡ Zero Friction</h3>
+      <p>No credit card needed to start. Free compute. Pay only for storage. Get your agent running in minutes.</p>
+    </div>
+    <div class="value-card">
+      <h3>🧩 Extensible by Design</h3>
+      <p>100+ built-in skills, custom skills from your sandbox, MCP tools — expand your agent's capabilities freely.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section class="center">
+  <h2>Leadership</h2>
+  <div class="team-grid">
+    <div class="team-card">
+      <div class="team-avatar">H</div>
+      <h3>Harris</h3>
+      <p>CEO &amp; Founder</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/pricing.html">Pricing</a>
+    <a href="/about.html">About</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/dashboard.html#login">Sign In</a>
+  </div>
+  <p>&copy; 2026 bapX. All rights reserved.</p>
+</footer>
+
+<script>
+function toggleMobile(){
+  document.getElementById('mobile-menu').classList.toggle('open');
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.mobile-menu') && !e.target.closest('.mobile-menu-btn')){
+    document.getElementById('mobile-menu').classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

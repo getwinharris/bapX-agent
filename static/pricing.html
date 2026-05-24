@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>bapX — Pricing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0f0f13;--bg2:#14141c;--bg3:#1a1a24;--fg:#e8e8f0;--muted:#6b7280;--accent:#9651b8;--accent-hover:#7a3f9e;--accent-light:rgba(150,81,184,0.12);--border:rgba(255,255,255,0.06);--radius:8px;--radius-lg:12px;--radius-xl:16px}
+    html{scroll-behavior:smooth;height:-webkit-fill-available}
+    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;line-height:1.6;min-height:100dvh;min-height:-webkit-fill-available}
+    a{color:var(--accent);text-decoration:none;transition:color .2s}
+    a:hover{color:#c084fc}
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;background:rgba(15,15,19,0.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:56px}
+    .nav-logo{font-size:1.375rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,#b35fd9,#7a3f9e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .nav-links{display:flex;align-items:center;gap:1.5rem}
+    .nav-links a{font-size:.875rem;font-weight:500;color:#9ca3af;transition:color .2s}
+    .nav-links a:hover{color:var(--fg)}
+    .nav-links a.active{color:var(--fg)}
+    .nav-cta{padding:.5rem 1.25rem;background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff!important;border-radius:var(--radius);font-weight:600;font-size:.8125rem;transition:all .2s}
+    .nav-cta:hover{box-shadow:0 4px 16px rgba(150,81,184,0.3);transform:translateY(-1px)}
+    .mobile-menu-btn{display:none;background:none;border:none;color:var(--fg);cursor:pointer;padding:4px}
+    .mobile-menu{display:none}
+    @media(max-width:768px){
+      .nav-links{display:none}
+      .mobile-menu-btn{display:block}
+      .mobile-menu{position:fixed;top:56px;left:0;right:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem;display:none;flex-direction:column;gap:.75rem;z-index:99}
+      .mobile-menu.open{display:flex}
+      .mobile-menu a{font-size:.9375rem;padding:.5rem 0;color:#9ca3af}
+      .mobile-menu .nav-cta{text-align:center;padding:.75rem}
+    }
+    section{padding:5rem 1.5rem;max-width:1100px;margin:0 auto}
+    .section-label{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+    .section-title{font-size:2.25rem;font-weight:800;letter-spacing:-0.03em;line-height:1.2;margin-bottom:1rem}
+    .section-subtitle{font-size:1.125rem;color:var(--muted);max-width:600px;line-height:1.6}
+    .center{text-align:center}
+    .center .section-subtitle{margin:0 auto 2rem}
+    .divider{height:1px;background:var(--border);margin:0 auto;max-width:1100px}
+    @media(max-width:768px){
+      section{padding:3rem 1rem}
+      .section-title{font-size:1.75rem}
+    }
+    .page-title{padding-top:7rem;padding-bottom:3rem;text-align:center}
+    .page-title h1{font-size:3rem;font-weight:800;letter-spacing:-0.04em;line-height:1.1;margin-bottom:1rem}
+    .page-title p{font-size:1.125rem;color:var(--muted);max-width:600px;margin:0 auto}
+    .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:2rem;max-width:900px;margin-left:auto;margin-right:auto}
+    @media(max-width:900px){.pricing-grid{grid-template-columns:1fr;max-width:400px}}
+    .price-card{background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:var(--radius-xl);padding:2rem;text-align:center;transition:all .3s;position:relative}
+    .price-card:hover{border-color:rgba(150,81,184,0.25);transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,0.3)}
+    .price-card.featured{border-color:var(--accent);background:rgba(150,81,184,0.04)}
+    .price-card.featured::before{content:'Most Popular';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff;font-size:.6875rem;font-weight:600;padding:.25rem 1rem;border-radius:20px;text-transform:uppercase;letter-spacing:.04em}
+    .price-card h3{font-size:1.125rem;font-weight:700;margin-bottom:.5rem}
+    .price-card .price{font-size:2.5rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:.25rem}
+    .price-card .price span{font-size:1rem;font-weight:400;color:var(--muted)}
+    .price-card .desc{font-size:.8125rem;color:var(--muted);margin-bottom:1.5rem;min-height:2.5rem}
+    .price-card ul{list-style:none;text-align:left;font-size:.8125rem;color:var(--muted);line-height:2.2;margin-bottom:1.5rem}
+    .price-card ul li{display:flex;align-items:center;gap:8px}
+    .price-card .btn{padding:.75rem 2rem;border-radius:var(--radius);font-size:.875rem;font-weight:600;cursor:pointer;transition:all .2s;display:inline-block;font-family:inherit;border:none;line-height:1}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff}
+    .btn-primary:hover{box-shadow:0 6px 24px rgba(150,81,184,0.35);transform:translateY(-2px)}
+    .btn-secondary{background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--fg)}
+    .btn-secondary:hover{background:rgba(255,255,255,0.08)}
+
+    footer{padding:2rem 1.5rem 3rem;border-top:1px solid var(--border);text-align:center}
+    footer p{font-size:.8125rem;color:var(--muted)}
+    footer .footer-links{display:flex;justify-content:center;gap:2rem;margin-bottom:1rem;flex-wrap:wrap}
+    footer .footer-links a{font-size:.8125rem;color:var(--muted)}
+    footer .footer-links a:hover{color:var(--fg)}
+
+    .faq{margin-top:3rem;text-align:left;max-width:700px;margin-left:auto;margin-right:auto}
+    .faq-item{padding:1.25rem 0;border-bottom:1px solid var(--border)}
+    .faq-item h4{font-size:.9375rem;font-weight:600;margin-bottom:.375rem}
+    .faq-item p{font-size:.8125rem;color:var(--muted);line-height:1.7}
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">bapX</a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/pricing.html" class="active">Pricing</a>
+    <a href="/about.html">About</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/dashboard.html#login">Sign In</a>
+    <a href="/dashboard.html#signup" class="nav-cta">Get Started</a>
+  </div>
+  <button class="mobile-menu-btn" onclick="toggleMobile()" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+</nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="/" onclick="toggleMobile()">Home</a>
+  <a href="/pricing.html" onclick="toggleMobile()">Pricing</a>
+  <a href="/about.html" onclick="toggleMobile()">About</a>
+  <a href="/docs.html" onclick="toggleMobile()">Docs</a>
+  <a href="/dashboard.html#login" onclick="toggleMobile()">Sign In</a>
+  <a href="/dashboard.html#signup" class="nav-cta" onclick="toggleMobile()">Get Started</a>
+</div>
+
+<section class="page-title">
+  <h1>Simple, <span style="background:linear-gradient(135deg,#b35fd9,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">storage-based</span> pricing</h1>
+  <p>AI compute is free. You only pay for storage — no feature tiers, no per-token charges.</p>
+</section>
+
+<section class="center" style="padding-top:0">
+  <div class="pricing-grid">
+    <div class="price-card">
+      <h3>Starter</h3>
+      <div class="price">$5<span>/mo</span></div>
+      <div class="desc">Perfect for getting started with your own AI agent</div>
+      <ul>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> 5 GB storage</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Unlimited AI compute</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> 1 sandbox container</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> All 100+ skills</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> 1 OAuth connection</li>
+      </ul>
+      <a href="/dashboard.html#signup" class="btn btn-primary">Get Started</a>
+    </div>
+
+    <div class="price-card featured">
+      <h3>Pro</h3>
+      <div class="price">$15<span>/mo</span></div>
+      <div class="desc">For power users who need more storage and sandboxes</div>
+      <ul>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> 25 GB storage</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Unlimited AI compute</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> 3 sandbox containers</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Unlimited skills</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Unlimited OAuth connections</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Custom memory retention</li>
+      </ul>
+      <a href="/dashboard.html#signup" class="btn btn-primary">Get Started</a>
+    </div>
+
+    <div class="price-card">
+      <h3>Team</h3>
+      <div class="price">$49<span>/mo</span></div>
+      <div class="desc">For teams collaborating with shared agents and resources</div>
+      <ul>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> 100 GB shared storage</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Unlimited AI compute</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> 10 sandbox containers</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Team workspaces</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Priority support</li>
+        <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Audit logs</li>
+      </ul>
+      <a href="/dashboard.html#signup" class="btn btn-secondary">Contact Us</a>
+    </div>
+  </div>
+</section>
+
+<section class="center faq">
+  <h2 style="margin-bottom:2rem">Frequently Asked Questions</h2>
+  <div class="faq-item">
+    <h4>What does "free AI compute" mean?</h4>
+    <p>We don't charge for tokens, model calls, or sandbox execution time. Your only cost is the storage your workspace uses. Connect your own API key or OAuth account and the AI compute comes from your existing provider plans.</p>
+  </div>
+  <div class="faq-item">
+    <h4>Can I upgrade or downgrade my plan?</h4>
+    <p>Yes — you can change your plan at any time. Upgrades take effect immediately. Downgrades apply at the next billing cycle.</p>
+  </div>
+  <div class="faq-item">
+    <h4>What happens if I exceed my storage?</h4>
+    <p>We'll notify you before you hit your limit. You can upgrade your plan or delete unused files to free up space. No automatic overage charges.</p>
+  </div>
+  <div class="faq-item">
+    <h4>Do I need my own API keys or subscriptions?</h4>
+    <p>Yes — bapX is a platform that connects your existing AI subscriptions (ChatGPT Plus, Claude Pro, etc.) or API keys. You bring your models, we provide the agent platform.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/pricing.html">Pricing</a>
+    <a href="/about.html">About</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/dashboard.html#login">Sign In</a>
+  </div>
+  <p>&copy; 2026 bapX. All rights reserved.</p>
+</footer>
+
+<script>
+function toggleMobile(){
+  var menu = document.getElementById('mobile-menu');
+  menu.classList.toggle('open');
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.mobile-menu') && !e.target.closest('.mobile-menu-btn')){
+    document.getElementById('mobile-menu').classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

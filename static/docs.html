@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>bapX — Documentation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0f0f13;--bg2:#14141c;--bg3:#1a1a24;--fg:#e8e8f0;--muted:#6b7280;--accent:#9651b8;--accent-hover:#7a3f9e;--accent-light:rgba(150,81,184,0.12);--border:rgba(255,255,255,0.06);--radius:8px;--radius-lg:12px;--radius-xl:16px;--sidebar-w:240px}
+    html{scroll-behavior:smooth;height:-webkit-fill-available}
+    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;line-height:1.6;min-height:100dvh}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{color:#c084fc}
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;background:rgba(15,15,19,0.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:56px}
+    .nav-logo{font-size:1.375rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,#b35fd9,#7a3f9e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .nav-links{display:flex;align-items:center;gap:1.5rem}
+    .nav-links a{font-size:.875rem;font-weight:500;color:#9ca3af}
+    .nav-links a:hover{color:var(--fg)}
+    .nav-links a.active{color:var(--fg)}
+    .nav-cta{padding:.5rem 1.25rem;background:linear-gradient(135deg,var(--accent),var(--accent-hover));color:#fff!important;border-radius:var(--radius);font-weight:600;font-size:.8125rem}
+    .mobile-menu-btn{display:none;background:none;border:none;color:var(--fg);cursor:pointer;padding:4px}
+    .mobile-menu{display:none}
+    @media(max-width:768px){
+      .nav-links{display:none}
+      .mobile-menu-btn{display:block}
+      .mobile-menu{position:fixed;top:56px;left:0;right:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem;display:none;flex-direction:column;gap:.75rem;z-index:99}
+      .mobile-menu.open{display:flex}
+      .mobile-menu a{font-size:.9375rem;padding:.5rem 0;color:#9ca3af}
+      .mobile-menu .nav-cta{text-align:center;padding:.75rem}
+    }
+    .layout{display:flex;padding-top:56px}
+    .sidebar-docs{width:var(--sidebar-w);flex-shrink:0;padding:2rem 1rem;position:sticky;top:56px;height:calc(100dvh - 56px);overflow-y:auto;border-right:1px solid var(--border)}
+    .sidebar-docs h3{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.75rem}
+    .sidebar-docs a{display:block;padding:.5rem .75rem;font-size:.8125rem;color:#9ca3af;border-radius:var(--radius);margin-bottom:2px;transition:all .2s}
+    .sidebar-docs a:hover{background:rgba(255,255,255,0.03);color:var(--fg)}
+    .sidebar-docs a.active{background:var(--accent-light);color:var(--accent)}
+    .main-docs{flex:1;padding:3rem 3rem 5rem;max-width:800px}
+    @media(max-width:900px){
+      .sidebar-docs{display:none}
+      .main-docs{padding:2rem 1.5rem}
+    }
+    .main-docs h1{font-size:2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:.5rem}
+    .main-docs .meta{font-size:.8125rem;color:var(--muted);margin-bottom:2rem}
+    .main-docs h2{font-size:1.5rem;font-weight:700;margin:2rem 0 1rem;padding-top:1rem}
+    .main-docs h3{font-size:1.125rem;font-weight:600;margin:1.5rem 0 .75rem}
+    .main-docs p{font-size:.9375rem;color:#9ca3af;line-height:1.8;margin-bottom:1rem}
+    .main-docs ul,.main-docs ol{padding-left:1.5rem;margin-bottom:1rem}
+    .main-docs li{font-size:.9375rem;color:#9ca3af;line-height:1.8;margin-bottom:.25rem}
+    .main-docs code{background:var(--bg3);padding:.125rem .375rem;border-radius:4px;font-size:.8125rem;color:#c084fc}
+    .main-docs pre{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;overflow-x:auto;margin-bottom:1rem}
+    .main-docs pre code{background:transparent;padding:0;color:var(--fg)}
+    .main-docs .note{padding:1rem;background:var(--accent-light);border:1px solid rgba(150,81,184,0.15);border-radius:var(--radius);margin-bottom:1rem;font-size:.875rem;color:#9ca3af}
+    .main-docs .note strong{color:var(--accent)}
+    footer{padding:2rem 1.5rem 3rem;border-top:1px solid var(--border);text-align:center}
+    footer p{font-size:.8125rem;color:var(--muted)}
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">bapX</a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/pricing.html">Pricing</a>
+    <a href="/about.html">About</a>
+    <a href="/docs.html" class="active">Docs</a>
+    <a href="/dashboard.html#login">Sign In</a>
+    <a href="/dashboard.html#signup" class="nav-cta">Get Started</a>
+  </div>
+  <button class="mobile-menu-btn" onclick="toggleMobile()" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+</nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="/" onclick="toggleMobile()">Home</a>
+  <a href="/pricing.html" onclick="toggleMobile()">Pricing</a>
+  <a href="/about.html" onclick="toggleMobile()">About</a>
+  <a href="/docs.html" onclick="toggleMobile()">Docs</a>
+  <a href="/dashboard.html#login" onclick="toggleMobile()">Sign In</a>
+  <a href="/dashboard.html#signup" class="nav-cta" onclick="toggleMobile()">Get Started</a>
+</div>
+
+<div class="layout">
+  <div class="sidebar-docs">
+    <h3>Getting Started</h3>
+    <a href="#quickstart" class="active">Quick Start</a>
+    <a href="#providers">Connecting Providers</a>
+    <a href="#oauth">OAuth Setup</a>
+    <h3 style="margin-top:1.5rem">Platform</h3>
+    <a href="#sandbox">Sandbox &amp; Isolation</a>
+    <a href="#skills">Skills</a>
+    <a href="#memory">Memory</a>
+    <h3 style="margin-top:1.5rem">API</h3>
+    <a href="#api-keys">API Keys</a>
+    <a href="#proxy">Chat Completions Proxy</a>
+  </div>
+
+  <div class="main-docs">
+    <h1>Documentation</h1>
+    <p class="meta">Everything you need to get started with bapX</p>
+
+    <h2 id="quickstart">Quick Start</h2>
+    <p>bapX is a browser-based AI agent platform. Here's how to get started:</p>
+    <ol>
+      <li><strong>Create an account</strong> — Sign up at <a href="/dashboard.html#signup">bapX.in/signup</a> with your email or Google account.</li>
+      <li><strong>Connect a provider</strong> — Add your OpenAI API key, connect ChatGPT via OAuth, or link your Claude account. You can connect multiple providers.</li>
+      <li><strong>Start chatting</strong> — Your agent is ready. Ask it to code, research, browse the web, or create content.</li>
+      <li><strong>Explore skills</strong> — Enable skills from the library to expand your agent's capabilities.</li>
+    </ol>
+
+    <div class="note">
+      <strong>💡 No credit card needed.</strong> You pay nothing to bapX until you need storage. AI compute is charged through your own provider accounts.
+    </div>
+
+    <h2 id="providers">Connecting Providers</h2>
+    <p>bapX supports 26+ AI providers. You can connect them in two ways:</p>
+    <h3>API Key</h3>
+    <p>Go to Settings → Providers and add your API key for any supported provider: OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, xAI Grok, Groq, Mistral, Together AI, Cohere, Perplexity, Hugging Face, and more.</p>
+    <h3>OAuth</h3>
+    <p>Supported OAuth providers: ChatGPT Plus/Pro, Claude Max, Google, Nous Portal, Qwen Portal, and GitHub Copilot. Click the OAuth button and follow the device-code flow in your browser.</p>
+
+    <h2 id="oauth">OAuth Setup</h2>
+    <p>OAuth lets you connect your existing subscriptions without sharing your API key:</p>
+    <ol>
+      <li>Go to Settings → Providers → OAuth</li>
+      <li>Click the provider you want to connect (ChatGPT, Claude, etc.)</li>
+      <li>A device code will appear — visit the provided URL and enter the code</li>
+      <li>Authorize the connection on the provider's site</li>
+      <li>Your provider is now linked. Select it in the model dropdown to start using it.</li>
+    </ol>
+
+    <div class="note">
+      <strong>🔒 Secure.</strong> OAuth tokens are encrypted at rest and never shared.
+    </div>
+
+    <h2 id="sandbox">Sandbox &amp; Isolation</h2>
+    <p>Each user gets their own isolated Docker sandbox. Every agent action — code execution, file operations, browser automation — runs inside this sandbox.</p>
+    <p><strong>Security guarantees:</strong></p>
+    <ul>
+      <li>Full filesystem isolation via Docker containers</li>
+      <li>Network configured per user — no cross-user traffic</li>
+      <li>Sandbox auto-cleans on session end</li>
+      <li>No shared state between users</li>
+      <li>Storage allocated per-user, billed by usage</li>
+    </ul>
+
+    <h2 id="skills">Skills</h2>
+    <p>bapX ships with 100+ built-in skills covering every domain:</p>
+    <ul>
+      <li><strong>Development:</strong> Code review, TDD, debugging, planning</li>
+      <li><strong>Creative:</strong> Design, ASCII art, video, illustration</li>
+      <li><strong>Data Science:</strong> Jupyter, evaluations, DSPy, W&B</li>
+      <li><strong>DevOps:</strong> GitHub workflows, deployments, monitoring</li>
+      <li><strong>Research:</strong> ArXiv, knowledge graphs, blog monitoring</li>
+      <li><strong>Web:</strong> Browser automation, scraping, testing</li>
+      <li><strong>And more:</strong> Gaming, social media, smart home, email</li>
+    </ul>
+    <p>You can also create custom skills in your sandbox. Any workflow you run can be saved as a reusable skill.</p>
+
+    <h2 id="memory">Memory</h2>
+    <p>bapX agents have persistent memory across sessions. Your agent remembers:</p>
+    <ul>
+      <li>Your preferences and coding style</li>
+      <li>Project conventions you've set</li>
+      <li>Facts about your environment</li>
+      <li>Workflows and approaches you prefer</li>
+    </ul>
+    <p>You can view, edit, or clear your agent's memory from Settings → Memory.</p>
+
+    <h2 id="api-keys">API Keys</h2>
+    <p>Need to use bapX programmatically? Generate an API key from Settings → API Keys. Use it to call the proxy endpoint directly:</p>
+    <pre><code>curl https://agent.bapx.in/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_BAPX_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"openai/gpt-4o","messages":[{"role":"user","content":"Hello"}]}'</code></pre>
+
+    <h2 id="proxy">Chat Completions Proxy</h2>
+    <p>The proxy endpoint routes your request to any connected provider:</p>
+    <pre><code>POST /v1/chat/completions
+Authorization: Bearer &lt;your-bapx-key&gt;
+Content-Type: application/json
+
+{
+  "model": "openai/gpt-4o",
+  "messages": [...],
+  "stream": true
+}</code></pre>
+    <p>Model format: <code>provider/model_name</code> (e.g., <code>anthropic/claude-sonnet-4</code>, <code>google/gemini-2.0-flash</code>)</p>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/pricing.html">Pricing</a>
+    <a href="/about.html">About</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/dashboard.html#login">Sign In</a>
+  </div>
+  <p>&copy; 2026 bapX. All rights reserved.</p>
+</footer>
+
+<script>
+function toggleMobile(){
+  document.getElementById('mobile-menu').classList.toggle('open');
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.mobile-menu') && !e.target.closest('.mobile-menu-btn')){
+    document.getElementById('mobile-menu').classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>
