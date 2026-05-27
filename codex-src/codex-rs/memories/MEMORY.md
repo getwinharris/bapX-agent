@@ -1,3 +1,0 @@
-bapX platform is at /root/Dev/bapx/. Backend is FastAPI on port 7654, single-file backend.py. Frontend is pure HTML/CSS/JS in static/. OpenSandbox runs user sandboxes. Codex is forked at codex-src/codex-rs/ — modify it to add features. Sandbox has Python, Node.js, Go, Rust, Git, curl, wget, jq, sqlite3 available.
-§
-The OAuth device code flow for model providers (ChatGPT, Claude, Google, Nous, Qwen, Copilot) is defined in backend.py ALL_PROVIDERS and OAUTH_CONFIGS. Client IDs currently use placeholder "bapx-device-flow" — need real client IDs from Hermes agent config.
